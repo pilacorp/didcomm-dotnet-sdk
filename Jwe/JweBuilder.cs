@@ -1,37 +1,40 @@
+using System;
+using System.Text;
 using System.Text.Json;
+using Newtonsoft.Json;
 
-namespace Pila.Credential.Sdk.DidComm.Jwe;
-
-public class Jwe
-{
-    public string Protected { get; set; } = string.Empty;
-    public string Iv { get; set; } = string.Empty;
-    public string Ciphertext { get; set; } = string.Empty;
-    public string Tag { get; set; } = string.Empty;
-}
+namespace Pila.CredentialSdk.DidComm.Jwe;
 
 public static class JweBuilder
 {
     public static string BuildJwe(byte[] sharedKey, byte[] iv, byte[] ciphertext)
     {
-        var header = new Dictionary<string, string>
+        var header = new
         {
-            ["alg"] = "ECDH-ES",
-            ["enc"] = "A256GCM",
-            ["crv"] = "secp256k1",
-            ["typ"] = "application/didcomm-encrypted+json"
+            alg = "ECDH-ES",
+            enc = "A256GCM",
+            crv = "secp256k1",
+            typ = "application/didcomm-encrypted+json"
         };
         
-        var headerBytes = JsonSerializer.SerializeToUtf8Bytes(header);
-        var jwe = new Jwe
+        var headerBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(header));
+        
+        var jwe = new JweModel
         {
-            Protected = Convert.ToBase64String(headerBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_'),
-            Iv = Convert.ToBase64String(iv).TrimEnd('=').Replace('+', '-').Replace('/', '_'),
-            Ciphertext = Convert.ToBase64String(ciphertext).TrimEnd('=').Replace('+', '-').Replace('/', '_'),
-            Tag = Convert.ToBase64String(sharedKey.Take(16).ToArray()).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+            Protected = Base64UrlEncode(headerBytes),
+            Iv = Base64UrlEncode(iv),
+            Ciphertext = Base64UrlEncode(ciphertext),
+            Tag = Base64UrlEncode(sharedKey[..16]) // mock tag for compatibility
         };
         
-        return JsonSerializer.Serialize(jwe, new JsonSerializerOptions { WriteIndented = true });
+        return JsonConvert.SerializeObject(jwe, Formatting.Indented);
+    }
+    
+    private static string Base64UrlEncode(byte[] input)
+    {
+        return Convert.ToBase64String(input)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
     }
 }
-

@@ -1,17 +1,16 @@
-using Pila.Credential.Sdk.DidComm.Crypto;
-using Pila.Credential.Sdk.DidComm.Jwe;
+using System.Text;
+using Pila.CredentialSdk.DidComm.Crypto;
+using Pila.CredentialSdk.DidComm.Jwe;
 
-namespace Pila.Credential.Sdk.DidComm;
+namespace Pila.CredentialSdk.DidComm;
 
 public static class Encryptor
 {
     public static string Encrypt(byte[] key, string plaintext)
     {
-        var (nonce, ciphertext) = AesGcmHelper.EncryptAesGcm(key, System.Text.Encoding.UTF8.GetBytes(plaintext));
+        var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
+        var (nonce, ciphertext) = AesGcmHelper.EncryptAesGcm(key, plaintextBytes);
         
-        var jweOutput = JweBuilder.BuildJwe(key.Take(16).ToArray(), nonce, ciphertext);
-        
-        return jweOutput;
+        return JweBuilder.BuildJwe(key[..16], nonce, ciphertext);
     }
 }
-
