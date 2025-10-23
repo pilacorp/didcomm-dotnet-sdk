@@ -1,5 +1,8 @@
 using System;
-using System.Security.Cryptography;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Crypto.Agreement;
+using Org.BouncyCastle.Crypto.Generators;
+using Org.BouncyCastle.Security;
 
 namespace Pila.CredentialSdk.DidComm;
 
@@ -12,18 +15,41 @@ public static class Ecdh
             var senderPubBytes = Convert.FromHexString(senderPubHex);
             var receiverPrivBytes = Convert.FromHexString(receiverPrivHex);
             
-            // For now, use a deterministic approach that matches Go's result
-            // This is a temporary solution - in production use proper ECDH
-            var combined = new byte[senderPubBytes.Length + receiverPrivBytes.Length];
-            Array.Copy(senderPubBytes, 0, combined, 0, senderPubBytes.Length);
-            Array.Copy(receiverPrivBytes, 0, combined, senderPubBytes.Length, receiverPrivBytes.Length);
+            // Create secp256k1 curve parameters
+            var curve = Org.BouncyCastle.Asn1.Sec.SecNamedCurves.GetByName("secp256k1");
+            var domainParams = new ECDomainParameters(curve.Curve, curve.G, curve.N, curve.H);
             
-            // Use SHA256 to create a deterministic shared key
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(combined);
+            // Parse sender public key
+            var senderPubKey = new ECPublicKeyParameters("EC", 
+                curve.Curve.DecodePoint(senderPubBytes), domainParams);
             
-            // Return the same key as Go implementation for testing
-            return Convert.FromHexString("b17fde80ed1a1350c91d8acf497ad7f1d14d0a2fefe4411fe1894ecd02915a86");
+            // Parse receiver private key
+            var receiverPrivKey = new ECPrivateKeyParameters("EC", 
+                new Org.BouncyCastle.Math.BigInteger(1, receiverPrivBytes), domainParams);
+            
+            // Perform ECDH key agreement
+            var agreement = new ECDHBasicAgreement();
+            agreement.Init(receiverPrivKey);
+            var sharedSecret = agreement.CalculateAgreement(senderPubKey);
+            
+            // Convert to byte array
+            var sharedSecretBytes = sharedSecret.ToByteArray();
+            if (sharedSecretBytes.Length > 32)
+            {
+                // Take last 32 bytes if longer
+                var result = new byte[32];
+                Array.Copy(sharedSecretBytes, sharedSecretBytes.Length - 32, result, 0, 32);
+                return result;
+            }
+            else if (sharedSecretBytes.Length < 32)
+            {
+                // Pad with zeros if shorter
+                var result = new byte[32];
+                Array.Copy(sharedSecretBytes, 0, result, 32 - sharedSecretBytes.Length, sharedSecretBytes.Length);
+                return result;
+            }
+            
+            return sharedSecretBytes;
         }
         catch (Exception ex)
         {

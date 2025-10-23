@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "v/clu23wg1g=",
+  "dgSpecHash": "8Og0Lx9mKbk=",
   "success": true,
   "projectFilePath": "/Users/linhnguyen/workspace/pila/didcomm-dotnet-sdk/Pila.CredentialSdk.DidComm.csproj",
   "expectedPackageFiles": [
+    "/Users/linhnguyen/.nuget/packages/bouncycastle.cryptography/2.6.2/bouncycastle.cryptography.2.6.2.nupkg.sha512",
     "/Users/linhnguyen/.nuget/packages/microsoft.netcore.platforms/1.1.0/microsoft.netcore.platforms.1.1.0.nupkg.sha512",
     "/Users/linhnguyen/.nuget/packages/microsoft.netcore.targets/1.1.0/microsoft.netcore.targets.1.1.0.nupkg.sha512",
     "/Users/linhnguyen/.nuget/packages/nbitcoin.secp256k1/3.1.6/nbitcoin.secp256k1.3.1.6.nupkg.sha512",
