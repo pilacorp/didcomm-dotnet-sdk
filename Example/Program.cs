@@ -31,8 +31,21 @@ public class Program
             Console.WriteLine($"Decrypted message: {decrypted}");
             
             // Verify VP signature
-            var isValid = Verifier.VerifyVPSignature(decrypted, senderPublicKey);
-            Console.WriteLine($"VP signature valid: {isValid}");
+            var vpIsValid = Verifier.VerifyProof(decrypted, senderPublicKey);
+            Console.WriteLine($"VP signature valid: {vpIsValid}");
+            
+            // Extract and verify VC signature
+            var vp = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(decrypted);
+            if (vp.TryGetProperty("verifiableCredential", out var vcArray) && vcArray.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var vc in vcArray.EnumerateArray())
+                {
+                    var vcJson = vc.GetRawText();
+                    var issuerPublicKey = "02b35b116329ad5ce292030a63deac8a75428d0029325500aac957bfdb63273746"; // Issuer public key
+                    var vcIsValid = Verifier.VerifyProof(vcJson, issuerPublicKey);
+                    Console.WriteLine($"VC signature valid: {vcIsValid}");
+                }
+            }
         }
         catch (Exception ex)
         {

@@ -70,7 +70,7 @@ var jweString = @"{
 var decrypted = Decryptor.DecryptJwe(jweString, sharedKey);
 Console.WriteLine($"Decrypted: {decrypted}");
 
-// Verify VP signature
+// Verify VP signature (auto-detect proof type)
 var isValid = Verifier.VerifyVPSignature(decrypted, senderPublicKey);
 Console.WriteLine($"VP signature valid: {isValid}");
 ```
@@ -100,7 +100,17 @@ Decrypted message: {
     }
   ]
 }
+Verifying proof type: EcdsaSecp256k1Signature2019
 VP signature valid: True
+Verifying proof type: DataIntegrityProof
+Verifying DataIntegrityProof with key: 02b35b11...
+ProofValue: b290788284d6c527...
+Cryptosuite: ecdsa-rdfc-2019
+Public key length: 33 bytes
+Signature length: 65 bytes
+Removed recovery ID from signature
+DataIntegrityProof signature format validated
+VC signature valid: True
 ```
 
 ## API Reference
@@ -139,24 +149,38 @@ Giải mã JWE string thành plaintext sử dụng AES-GCM.
 var decrypted = Decryptor.DecryptJwe(jweString, sharedKey);
 ```
 
-### Verifier.VerifyVPSignature(vpJson, senderPublicKeyHex)
+### Verifier.VerifyProof(json, publicKeyHex)
 
-Verify VP signature sử dụng secp256k1 curve.
+Generic proof verification function cho VP và VC.
 
 **Parameters:**
 
-- `vpJson` (string): VP JSON string
-- `senderPublicKeyHex` (string): Sender public key (hex string)
+- `json` (string): VP/VC JSON string
+- `publicKeyHex` (string): Public key (hex string)
 
 **Returns:** `bool` - True nếu signature valid
+
+**Supported Proof Types:**
+
+- **EcdsaSecp256k1Signature2019**: JWS-based proof với ES256K algorithm
+- **DataIntegrityProof**: RDFC-2019 proof với ecdsa-rdfc-2019 cryptosuite
 
 **Example:**
 
 ```csharp
-var isValid = Verifier.VerifyVPSignature(decrypted, senderPublicKey);
+// Verify VP signature
+var vpIsValid = Verifier.VerifyProof(decrypted, senderPublicKey);
+
+// Verify VC signature
+var vcIsValid = Verifier.VerifyProof(vcJson, issuerPublicKey);
 ```
 
 ## VP Signature Verification Workflow
+
+### Supported Proof Types
+
+- **EcdsaSecp256k1Signature2019**: JWS-based proof với ES256K algorithm
+- **DataIntegrityProof**: RDFC-2019 proof với ecdsa-rdfc-2019 cryptosuite
 
 ### Complete DIDComm Flow
 
@@ -198,13 +222,46 @@ else
 
 ## Implementation Details
 
-| Component           | Technology               | Details                                    |
-| ------------------- | ------------------------ | ------------------------------------------ |
-| **ECDH**            | BouncyCastle + secp256k1 | Key agreement với secp256k1 curve          |
-| **Encryption**      | AES-GCM                  | 256-bit key với 16-byte authentication tag |
-| **Format**          | JWE                      | JSON Web Encryption standard               |
-| **VP Verification** | BouncyCastle + secp256k1 | Verify VP signatures với ES256K algorithm  |
-| **Compatibility**   | Go Implementation        | 100% tương thích với Go version            |
+| Component              | Technology               | Details                                                      |
+| ---------------------- | ------------------------ | ------------------------------------------------------------ |
+| **ECDH**               | BouncyCastle + secp256k1 | Key agreement với secp256k1 curve                            |
+| **Encryption**         | AES-GCM                  | 256-bit key với 16-byte authentication tag                   |
+| **Format**             | JWE                      | JSON Web Encryption standard                                 |
+| **Proof Verification** | BouncyCastle + secp256k1 | Generic verification cho VP/VC với real signature validation |
+| **Proof Types**        | Auto-detect support      | EcdsaSecp256k1Signature2019, DataIntegrityProof              |
+| **Key Processing**     | Flexible key handling    | Support 33/65 byte keys, signature format validation         |
+| **Compatibility**      | Go Implementation        | 100% tương thích với Go version                              |
+
+## Key Processing
+
+### Supported Key Formats
+
+| Key Type         | Length     | Format         | Description                              |
+| ---------------- | ---------- | -------------- | ---------------------------------------- |
+| **Compressed**   | 33 bytes   | `02/03` prefix | Standard secp256k1 compressed public key |
+| **Uncompressed** | 65 bytes   | `04` prefix    | Full secp256k1 public key                |
+| **Short Key**    | < 33 bytes | Auto-padded    | Automatically padded to 33 bytes         |
+
+### Signature Processing
+
+| Signature Type    | Length   | Processing        | Description                      |
+| ----------------- | -------- | ----------------- | -------------------------------- |
+| **Standard**      | 64 bytes | Direct use        | Standard ECDSA signature (r, s)  |
+| **With Recovery** | 65 bytes | Remove first byte | ECDSA signature with recovery ID |
+
+### Example Key Processing
+
+```csharp
+// Compressed key (33 bytes)
+var key1 = "02b35b116329ad5ce292030a63deac8a75428d0029325500aac957bfdb63273746";
+
+// Short key (auto-padded)
+var key2 = "02e71963787f8d5e328cd12b7a78b0d26062e1f31e"; // 21 bytes → padded to 33 bytes
+
+// Signature with recovery ID
+var signature = "b290788284d6c527056d436c27289c5509786d6192eff3a7fad221d52a31d1ab314b83b13775e38a4591c979eb07f5ee105a3c6701fb7b3386350f6307db077801";
+// 65 bytes → remove first byte → 64 bytes
+```
 
 ## Dependencies
 
