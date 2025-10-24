@@ -1,23 +1,27 @@
 # Pila Credential SDK - DIDComm .NET
 
+[![.NET](https://img.shields.io/badge/.NET-9.0-blue.svg)](https://dotnet.microsoft.com/download)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![NuGet](https://img.shields.io/nuget/v/Pila.CredentialSdk.DidComm.svg)](https://www.nuget.org/packages/Pila.CredentialSdk.DidComm)
+
 Thư viện .NET để mã hóa và giải mã DIDComm messages với tương thích hoàn toàn với Go implementation.
 
-## Tính năng
+## 🚀 Tính năng
 
-- AES-GCM encryption/decryption
-- ECDH key agreement với secp256k1
-- JWE (JSON Web Encryption) support
-- DIDComm message format
-- Tương thích với Go implementation
+- ✅ **ECDH Key Agreement** - secp256k1 curve với BouncyCastle
+- ✅ **AES-GCM Encryption** - 256-bit key với 16-byte authentication tag
+- ✅ **JWE Support** - JSON Web Encryption format đầy đủ
+- ✅ **DIDComm Compatible** - Tương thích 100% với Go implementation
+- ✅ **Cross-platform** - Windows, macOS, Linux
 
-## Yêu cầu hệ thống
+## 📋 Yêu cầu hệ thống
 
 - .NET 9.0+ (hoặc .NET 8.0+)
 - Windows, macOS, hoặc Linux
 
-## Cài đặt
+## 📦 Cài đặt
 
-### Từ NuGet Package
+### NuGet Package
 
 ```bash
 dotnet add package Pila.CredentialSdk.DidComm
@@ -32,30 +36,25 @@ dotnet restore
 dotnet build
 ```
 
-## Sử dụng cơ bản
+## 🔧 Sử dụng
 
-### 1. Mã hóa message
+### ECDH Key Agreement
 
 ```csharp
 using Pila.CredentialSdk.DidComm;
 
-// Khóa công khai của người gửi (hex string)
+// Khóa công khai của người gửi
 var senderPublicKey = "038c551307177dd8c2f54612f08c7c040073ebb0154bb61bcd4d02f376d4ce93b2";
 
-// Khóa riêng của người nhận (hex string)
+// Khóa riêng của người nhận
 var receiverPrivateKey = "0fc5abedcb46e4b63d2febc13cb308f0bbdcff7bc27e9621d18977cc6fa1713d";
 
 // Tạo shared key từ ECDH
 var sharedKey = Ecdh.GetFromKeys(senderPublicKey, receiverPrivateKey);
-
-// Mã hóa message
-var message = "Hello DIDComm!";
-var encrypted = Encryptor.Encrypt(sharedKey, message);
-
-Console.WriteLine($"Encrypted: {encrypted}");
+Console.WriteLine($"Shared key: {Convert.ToHexString(sharedKey)}");
 ```
 
-### 2. Giải mã message
+### Giải mã JWE Message
 
 ```csharp
 // JWE string từ người gửi
@@ -71,51 +70,99 @@ var decrypted = Decryptor.DecryptJwe(jweString, sharedKey);
 Console.WriteLine($"Decrypted: {decrypted}");
 ```
 
-## Chạy example
+## 🏃‍♂️ Chạy Example
 
 ```bash
 cd didcomm-dotnet-sdk
 dotnet run
 ```
 
-## API Reference
+## 📊 Example Output
 
-### Ecdh.GetFromKeys(senderPubHex, receiverPrivHex)
+```
+Shared key generated: E74AEAAF9AB71F38820C0882EDBB1F013C17328A685F79130C78352A2143635B
+Decrypted message: {
+  "@context" : [ "https://www.w3.org/2018/credentials/v1" ],
+  "type" : [ "VerifiablePresentation" ],
+  "verifiableCredential" : [
+    {
+      "credentialSubject" : {
+        "citizenIdentify" : "035187003000",
+        "phoneNumber" : "0972000331",
+        "result" : "matched",
+        "issuedBy" : "Viettel"
+      }
+    }
+  ]
+}
+```
 
-Tạo shared key từ ECDH key agreement.
+## 📚 API Reference
+
+### `Ecdh.GetFromKeys(senderPubHex, receiverPrivHex)`
+
+Tạo shared key từ ECDH key agreement với secp256k1 curve.
 
 **Parameters:**
 
-- `senderPubHex`: Khóa công khai của người gửi (hex string)
-- `receiverPrivHex`: Khóa riêng của người nhận (hex string)
+- `senderPubHex` (string): Khóa công khai của người gửi (hex string)
+- `receiverPrivHex` (string): Khóa riêng của người nhận (hex string)
 
 **Returns:** `byte[]` - Shared key 32 bytes
 
-### Encryptor.Encrypt(sharedKey, plaintext)
+**Example:**
 
-Mã hóa plaintext thành JWE format.
+```csharp
+var sharedKey = Ecdh.GetFromKeys(senderPublicKey, receiverPrivateKey);
+```
 
-**Parameters:**
+### `Decryptor.DecryptJwe(jweString, sharedKey)`
 
-- `sharedKey`: Shared key từ ECDH
-- `plaintext`: Text cần mã hóa
-
-**Returns:** `string` - JWE JSON string
-
-### Decryptor.DecryptJwe(jweString, sharedKey)
-
-Giải mã JWE string thành plaintext.
+Giải mã JWE string thành plaintext sử dụng AES-GCM.
 
 **Parameters:**
 
-- `jweString`: JWE JSON string
-- `sharedKey`: Shared key từ ECDH
+- `jweString` (string): JWE JSON string
+- `sharedKey` (byte[]): Shared key từ ECDH
 
 **Returns:** `string` - Decrypted plaintext
 
-## Dependencies
+**Example:**
 
-- .NET 9.0+ (hoặc .NET 8.0+)
-- NBitcoin.Secp256k1 (3.1.6)
-- Newtonsoft.Json (13.0.3)
-- System.Security.Cryptography.Algorithms (4.3.1)
+```csharp
+var decrypted = Decryptor.DecryptJwe(jweString, sharedKey);
+```
+
+## 🔧 Implementation Details
+
+| Component         | Technology               | Details                                    |
+| ----------------- | ------------------------ | ------------------------------------------ |
+| **ECDH**          | BouncyCastle + secp256k1 | Key agreement với secp256k1 curve          |
+| **Encryption**    | AES-GCM                  | 256-bit key với 16-byte authentication tag |
+| **Format**        | JWE                      | JSON Web Encryption standard               |
+| **Compatibility** | Go Implementation        | 100% tương thích với Go version            |
+
+## 📦 Dependencies
+
+- **.NET 9.0+** (hoặc .NET 8.0+)
+- **BouncyCastle.Cryptography** (2.6.2) - ECDH và cryptographic operations
+- **Newtonsoft.Json** (13.0.3) - JSON parsing
+- **System.Security.Cryptography.Algorithms** (4.3.1) - AES-GCM support
+
+## 🤝 Contributing
+
+1. Fork repository
+2. Tạo feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Tạo Pull Request
+
+## 📄 License
+
+MIT License - xem [LICENSE](LICENSE) file để biết thêm chi tiết.
+
+## 🔗 Links
+
+- [DIDComm Specification](https://identity.foundation/didcomm-messaging/spec/)
+- [JWE RFC 7516](https://tools.ietf.org/html/rfc7516)
+- [secp256k1 Curve](https://en.bitcoin.it/wiki/Secp256k1)
