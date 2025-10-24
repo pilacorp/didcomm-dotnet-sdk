@@ -33,19 +33,6 @@
           "lib/netstandard1.0/_._": {}
         }
       },
-      "NBitcoin.Secp256k1/3.1.6": {
-        "type": "package",
-        "compile": {
-          "lib/net6.0/NBitcoin.Secp256k1.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/net6.0/NBitcoin.Secp256k1.dll": {
-            "related": ".xml"
-          }
-        }
-      },
       "Newtonsoft.Json/13.0.3": {
         "type": "package",
         "compile": {
@@ -589,22 +576,6 @@
         "microsoft.netcore.targets.1.1.0.nupkg.sha512",
         "microsoft.netcore.targets.nuspec",
         "runtime.json"
-      ]
-    },
-    "NBitcoin.Secp256k1/3.1.6": {
-      "sha512": "Ao9jN/16lhQoI0aMdUxgiEfuyFdg2nd2SdinqqEFuCyYl1NH6upa++Tp0wbXHTr6jf7klXh3wjmsX+ArzliZRQ==",
-      "type": "package",
-      "path": "nbitcoin.secp256k1/3.1.6",
-      "files": [
-        ".nupkg.metadata",
-        ".signature.p7s",
-        "icon.png",
-        "lib/net6.0/NBitcoin.Secp256k1.dll",
-        "lib/net6.0/NBitcoin.Secp256k1.xml",
-        "lib/netstandard2.1/NBitcoin.Secp256k1.dll",
-        "lib/netstandard2.1/NBitcoin.Secp256k1.xml",
-        "nbitcoin.secp256k1.3.1.6.nupkg.sha512",
-        "nbitcoin.secp256k1.nuspec"
       ]
     },
     "Newtonsoft.Json/13.0.3": {
@@ -2212,7 +2183,6 @@
   "projectFileDependencyGroups": {
     "net9.0": [
       "BouncyCastle.Cryptography >= 2.6.2",
-      "NBitcoin.Secp256k1 >= 3.1.6",
       "Newtonsoft.Json >= 13.0.3",
       "System.Security.Cryptography.Algorithms >= 4.3.1"
     ]
@@ -2263,10 +2233,6 @@
           "BouncyCastle.Cryptography": {
             "target": "Package",
             "version": "[2.6.2, )"
-          },
-          "NBitcoin.Secp256k1": {
-            "target": "Package",
-            "version": "[3.1.6, )"
           },
           "Newtonsoft.Json": {
             "target": "Package",

@@ -1,13 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "8Og0Lx9mKbk=",
+  "dgSpecHash": "0w8IwmkKf+w=",
   "success": true,
   "projectFilePath": "/Users/linhnguyen/workspace/pila/didcomm-dotnet-sdk/Pila.CredentialSdk.DidComm.csproj",
   "expectedPackageFiles": [
     "/Users/linhnguyen/.nuget/packages/bouncycastle.cryptography/2.6.2/bouncycastle.cryptography.2.6.2.nupkg.sha512",
     "/Users/linhnguyen/.nuget/packages/microsoft.netcore.platforms/1.1.0/microsoft.netcore.platforms.1.1.0.nupkg.sha512",
     "/Users/linhnguyen/.nuget/packages/microsoft.netcore.targets/1.1.0/microsoft.netcore.targets.1.1.0.nupkg.sha512",
-    "/Users/linhnguyen/.nuget/packages/nbitcoin.secp256k1/3.1.6/nbitcoin.secp256k1.3.1.6.nupkg.sha512",
     "/Users/linhnguyen/.nuget/packages/newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg.sha512",
     "/Users/linhnguyen/.nuget/packages/runtime.debian.8-x64.runtime.native.system.security.cryptography.openssl/4.3.2/runtime.debian.8-x64.runtime.native.system.security.cryptography.openssl.4.3.2.nupkg.sha512",
     "/Users/linhnguyen/.nuget/packages/runtime.fedora.23-x64.runtime.native.system.security.cryptography.openssl/4.3.2/runtime.fedora.23-x64.runtime.native.system.security.cryptography.openssl.4.3.2.nupkg.sha512",

@@ -29,6 +29,10 @@ public class Program
             // Decrypt message
             var decrypted = Decryptor.DecryptJwe(encrypted, sharedKey);
             Console.WriteLine($"Decrypted message: {decrypted}");
+            
+            // Verify VP signature
+            var isValid = Verifier.VerifyVPSignature(decrypted, senderPublicKey);
+            Console.WriteLine($"VP signature valid: {isValid}");
         }
         catch (Exception ex)
         {
