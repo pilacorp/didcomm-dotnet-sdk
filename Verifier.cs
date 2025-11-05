@@ -30,7 +30,7 @@ public static class Verifier
             var proofType = proof.TryGetProperty("type", out var typeElement) ? typeElement.GetString() : "";
             
             Console.WriteLine($"Verifying proof type: {proofType}");
-            
+
             // Verify based on proof type
             switch (proofType)
             {
@@ -197,30 +197,36 @@ public static class Verifier
         }
     }
     
-    private static bool VerifySecp256k1Signature(byte[] publicKeyBytes, byte[] messageBytes, byte[] signatureBytes)
+private static bool VerifySecp256k1Signature(byte[] publicKeyBytes, byte[] messageBytes, byte[] signatureBytes)
     {
         try
         {
             // Create secp256k1 curve parameters
             var curve = Org.BouncyCastle.Asn1.Sec.SecNamedCurves.GetByName("secp256k1");
             var domainParams = new ECDomainParameters(curve.Curve, curve.G, curve.N, curve.H);
-            
+
             // Parse public key
-            var publicKey = new ECPublicKeyParameters("EC", 
+            var publicKey = new ECPublicKeyParameters("EC",
                 curve.Curve.DecodePoint(publicKeyBytes), domainParams);
-            
+
             // Create ECDSA signer
             var signer = new ECDsaSigner();
             signer.Init(false, publicKey);
-            
+
             // Hash message with SHA256
             using var sha256 = SHA256.Create();
             var messageHash = sha256.ComputeHash(messageBytes);
-            
+
+            // Handle recovery ID if signature is 65 bytes (first byte is recovery ID)
+            if (signatureBytes.Length == 65)
+            {
+                signatureBytes = signatureBytes.Skip(1).ToArray();
+            }
+
             // Parse signature (r, s format)
             var r = new BigInteger(1, signatureBytes, 0, 32);
             var s = new BigInteger(1, signatureBytes, 32, 32);
-            
+
             // Verify signature
             return signer.VerifySignature(messageHash, r, s);
         }

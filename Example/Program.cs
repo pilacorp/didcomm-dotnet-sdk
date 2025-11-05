@@ -7,7 +7,7 @@ public class Program
     public static void Main(string[] args)
     {
         // Example usage
-        var senderPublicKey = "032c9d922daa04d446612b168180c649752316456944a6d36e0dbcf4dc7c299aa5";
+        var senderPublicKey = "03951a8f2673371c1ad37e6b0e00dcd4800a777cfce53857115cb2ab3dbedbda22";
         var receiverPrivateKey = "3756330b933a117066e4509ef87b2d82ce10829208ecdd52c9754ddaa1abe746";
         
         try
@@ -18,10 +18,10 @@ public class Program
             
             // Encrypt message
             var encrypted = @"{
-                    ""protected"": ""eyJhbGciOiJFQ0RILUVTIiwiY3J2Ijoic2VjcDI1NmsxIiwidHlwIjoiYXBwbGljYXRpb25cL2RpZGNvbW0tZW5jcnlwdGVkK2pzb24iLCJlbmMiOiJBMjU2R0NNIn0"",
-                    ""iv"": ""vwHAsvPxoSQt6qo8"",
-                    ""ciphertext"": ""PdN29Gsp2Uquh2sjZPMi1IAvU39ZEgkuM1wI0iWwRqkzg_TQhBJhBRWQD8wHCxxNvQ4QyoeZU3tAOzN3b-dv8ZOq1iWZ1NVF4rcHpWrS-RBv4MmOIPXXNthatc7yH1x9lzbjNhdYThwY2fojeJtbK5EikWb2Cxfjg5nQ31ZkJDuKK3tyMZNmPNKX1THK0vp9R9haYkOjK3o9EyezRvuCTUXDJWd-aEw8n7Bm8JNueUw8Yw-jDcrXVC5QfO2-c3BnE6c57DrSkrHtg-K657fCrJ3sj1mOSw6scGs1-NG9WMB0VyT5LGQ31JpXv_24XrqKX67qFALXAiwu3uEaufFfMSDIw7tQsSY1kU5ZdXUWGzQgptkf37PGjhpWhDY6SieWuYmsfYMO5ZR_SyYJfBj2jOnEqQO53N8hpbEe6ZVUiwxQkd4N6YIi_6k57AneeRlBrnP5AlWnPIkZpvTBk_Gjogpy38IiDt4ZtAuvz5R327FbXpdwxokhaD6kA_OXQFkPr63MUdwUNnqO6FDx20izrW9_B5CoT1GYPW00ENxSSoMC0fXdTmS2I8a9wTHXzaUtlRSQ6XHqeclavsZTPgeWWtGdQ4DpeTvygNHmpzIIGvaRzGGd3ZrJsWzGRUSdGE0PoccY_Jcuo5lJ3G162wdnPIJiVhEEos1cPTzg24ox-v5qA6ibtfxwGSElLd_DUbwwk2I_4u-vLcSTJgS7eQgOKtrVnhNk0YTVlrhnDnIN_oWKATDjf1mxUoNo0fOkOsxWQ6jSbBOOrM-ROAevJfEq4bIYIdb10LCQ2uVOybJ3BbuJfJJFREry0MYJ75R_MXNJlZXFfaCGqWrySZ_PtEkb4hsrR6-v6kkiHWJYVncSY0VWHaU2sLmkN0ILDX2-sriLcySXXuRcqUvkNPp5tej4BOS_VwyDlYJ6RAoyvItiWqrqhUD3AX0iEA6XyJLMT6xjF5cZ46dlgPY8FVx6ulfD3ljMjK87dflNvW7ueWDtDt5PDRKoiYCbRNva-bjSamP8h9I9BoMysuWHVGkBMln0_ww2dniyDtPRzodHANlal66kfzAmx5seE_97cZrF2zY3JwjzVeUNUD3E0NrwQY3GXCnv-M3Rwz2OdYJYkVSOJmfDLmnIZHiN7pgRBIOJ89KS6TNweOhqXx-XwjDXBbzsLCQ6O3zIscZJ60EuZOjND_jw69uVRiLmdAryv2rqt2pBBVplS4fh3AbEEwiAX-01pztu5EwAChNxsAsjQnbsX5dAKypasKdIHmsRPsPU0k_cTJddZQRSZFuAjluA0yV-NJaej3XoJPzLUQ7DCbTR-6eTROgrBzCe9MXi-0WIIme28dCUe7TBqiSNG9q8zqnhTBp5OHCIzhojX1wX1v8cnHTWxYlii-KWHX9YMdEukQwnVT5hi_ipFUu6KRoDzOgYAhUZE2ZYLxOw8WnwbU5p9aIlslvDm8acQ9BOBSde0qRinv_Ss4seBc5FqQI1AB50d25CNMwk1PbjUxDuEn8ZrXI2lRy3tRdYC8KGqn2Sx3Xz7AGHm0h4q7ZepYjvAAQNpZnfgfQlY-pCjb0qVFq71LLEaNQ_V-Rph8Mi7OaI8_pDPoHDHCApkym-hr35qs3e7aDPuduTe0y5n15Oe1hzOST3a1-7TL9g9u77fUXHVCLcQEQQNrWuhLhn6TGn7oKo8zFyJTHIQFBHNgjebujmzZEWzKAqwvfqCCUMMicqI0Evxfs96D7aR-S2rnlmXa4q3qluaCGiO1fzaGKzEAx-P-kqkU2_YNrFX195GPip7oFA0RBnKRWBgFJlCAGyRvs_q4g6OiJNH8_hjxR_m02dFT-sqYtiSK423aSU4lK1VrB38EpYlzDvUsvmVcg3EYv7EK-6jYMFk8x9pBrcf9dOP4HALWMs4SwFInFmxOW-X0WKNkoXvDkDy7c6ENX0TlNHKjSx64vVgX8ZXUqrYAs02r1B0Y9vG3j2G_jTERGlhWvLyvXcvjabYrpUdSRTru81rRvk2nBaz7tc_HvgC8esPQJzQEv4eV8IuPHFngRvJGNsCAfwyG4LN7al-5egTI4Chn4NghrIvzASELmv7WrEt-QkaQO7uku1lapYV8FL1PvygZwfQLBQLE5ADye08rA8jpeMkBKVKVLhHUiLNSltMROkByRWqaC_iUJByJFbyS4xr7aFVssnXNlQ6YTTRyONV36hHlY6FyKV4MDxFv7BdOyPUI4v1hGEVC47IdKgPZ958O0wCYiVqGRCU-ngprm5MG343CPyqKy4NSTByu_FAKDzTqGlrWQIi2ziJ4FFPYPfsRUy_Ow1BxmIUKYT-pKR-QMe68nurYyvzFXPF5e5O9RR-qJ_-9gtl4byVHYgAOHoXPlrgdxSempf2t_YzrOlaZmhIe_jbODb8lIdeGVI2fED2DC_T_6PBaKIwAVFdyqLK2tpwrjBLuE5gg1DFz95VdvWzllxrgNwQXPgLnTCHD82xn8sogh3cYwKqaYwCaQDq4Qwjw8VVl_NsLwSeW5pBo_dIA5mwPmB-omAICRgmPig-CIc-WI1CJ-sEZs9vpbyOv11UNvCd05zj-uLKxJRc-7l60v-VVqSl6ZR8ufMZSZYYLCsb9Rtq4O1b0d0nnbj3dT551iqzCFP7XrPqxYp_ny3oCS-DIwuE2_BRf9n0Obaul45hwfJMELpma6Tiumw0GMzHbUBjj2_5pv0dMKTtpRo6byuS5ZygoxdRk7JMP3kIuDyi2LkXR5_RpgBmSZz2LIlnkCqS6KMg90vR5huaJUrfvMmzmIQ5kZ4ALkt6DAVI8XbyGpdwuACvA_GXnPsdhwegxQKYWg_j-xhFJY7tT5w5RBSMd7vEGQih11_JPGz1aZMf_E8fyqsC_mM_kx_J3xYD6lDBwTLANKbJ2LhM6eO_4dK-x680HA0OCSj1rZz1woOQK5RceieS_AtcfsYJbZBUsz8yv158EfPiGYmCVzpYtAdgBMb4vd0LGJd5CViOeBWKFshEhvVUzISY55jJvodg6CnfU3xiARPf98MF6RfxC5T8tVJc6psGxwq5gWu0rTMQvUn41zTLjzfLfprKw-huazRk-LYqEDPyCAaeZYUgIOZn7zR6kYVairN0bmF6KJtWhUYNuPJ7ouDavudbC6sF_nsTqiVaBkhhCno5fd996tQUnoM03jt1bcD52tAzgpI7uuSeScutWj4PWlceNo4ab1UHFmK0ZqnFuGtXFDGvLNKMvfPHsJuvXPfBDbbEMOWbOtCLHAsvxW1EGgqFMv5E4ULuOBZ3zdMZSW88K4kEAddagVZXvs-pOvd-N5QCs958rHXyTIHlMUPh0IYMJySwzVia2vFJSH82rwuQ4N2OWtmhPaZbCtr1Jil7PszT25xRhjLiMr8Kv-_lnz5HWQ-zhrB7JiFwXRxW-wOr6rh2OXGpPnRPplef5dXoDKfQsbAwJwuSQvXkkVY5un66fRTLXpwHkfnxObFr33WF_qORx4oMOcbLXDrdcznI2ODIykTWh4fcaH4QCXk7pMlYoVJLJ1zXJ8ABNRjvLnvUmw0TmyS6sQlqfS-hF8wQmpqLowzWH71b-GIRUvqSw3mVCbiG2sZ_39WI7JXIbUnjao7SS66p5yUnYPV6A7IR_7RKQs43XoeYeC4AP_ese4pGDD9OPGzRbpi0Nid9CClYhgd8Do7_coDoDOZPctR5jxRtjahCY791eUI6GZ_Lh1DyvyJGu0hnvv-UOOPGcdlUU7NuVwx5BXu5BJBKtxsMoXd6cB5aAKW7cGwszMqUWOH8QCFv326KbxCdny1XKBpFp4XomiQWF73Pvmwp4OmhJwFp8di7mJpbSVMbSIYr8w5_S4gMpIKu0wNi7q1XnFVmyg0kOgLCXeUzrceCzRkLAzowgRjx-OB3WSCyMpP3oPqOETO4uLObNGI5e-zPEfjfvwhPIs-IrnN-IszQDfpAzcO6hNNIJqqNrFaulGbWz8Fdlt3gwpmMeP-SIkXbc1SSHhmEiKvEOXdC2QRI6g9mnq8Yi380-KwzPUIsF-_3dVvLS1Anx44WgF6sQ7hNt5TNJCob_ihpr6u0LJMAw4vXyyZIsx4S8lZ-gefqFP_fBAsUBHHxGDnsYgOeclikoJ9a0Dzc79VfX6m7yEs9et2DnKSjFXURrTYLZIK1nMIrI9GhcP1Ei8DB2PL7yrFhtkNSWeQWlK-eeyR6vmWFzN7LvPNGmxaPRcSdK2yfeG3Wr2hhWBBx_74pClnCQubl3x-5BwjWq0Q23Uv5oowwZvzIkxkrLtBpzUD51w8QnsYpU8HK2tazO6iUy_2bHtdAnLmcSvtDEDT2mXo6jq5ocIGFX_4O5PS2MkrDuVFq1Q0uiFMEm1w1C7LPOY4kFDtIHyDdS6O7qJ4vyh9EXs0FCRRpOp5sgrzcPP0JbxMHhTxSzjyNcksuYXNWiLis7o1iya0ELfXG4chYllLwDrkjkHFmtPBfRYqaqPmCOA-OkBRQovYB0GmPUON6cpl758ZHlrONb25y5ienmya9t_FIcKE4tpEiiskcJKfcQ"",
-                    ""tag"": ""50rqr5q3HziCDAiC7bsfAQ""
+                    ""protected"": ""eyJjcnYiOiJzZWNwMjU2azEiLCJ0eXAiOiJhcHBsaWNhdGlvblwvZGlkY29tbS1lbmNyeXB0ZWQranNvbiIsImFsZyI6IkVDREgtRVMiLCJlbmMiOiJBMjU2R0NNIn0"",
+                    ""iv"": ""WIeBYfTuEA4kMeFa"",
+                    ""ciphertext"": ""UmSpMp2Pb0ZCwN5OEpx7c7j4HHVYxKq6Rc0GgqAHLG9zTtu1RcrdoP31r-liAjPZu_uGNjOih4XK9tq7tASiLe4RvcJKlGg3nttJReoOOVpbZDkJAKr-N6r8I7ubCdBG3mXmg-rpU6wODXwar0nD1wfO1MTrKD7ENM0SY15r_Qvy15UZmOOuU63T6ZIgLHCMvtaOks5nefdf2hhacU8nqQyxKdouwvvX1tA_MxbhlGMf7rv9UpYl7VRX74QriAcAX0BR6NijuicBsVV-IfYTPRjfDtTr3I5aa_9hGt-I8ngaKxdYubDpmxcuyxK1kvoGtpChttAgfDIKJ0Q7yYdokndPUUvutWFZe-W3qpTzZWMzxtzkT7mN9XW31-4twSZ6Tw53PJ8U_w7_WfDIsQOZvsZNCfE8hLXS4DMDd29FZWNF-rJgu5hWBpPxu4cKfGj0j51mNqQQRlcCxsc51HG98qP-3naxH01l9-VcgsnY6Lapcqxd5gvsDK7_5CHoBp6oZIcZ5cIErTfDm7lHW-joClmfA03upp_4rtTa1AVhfaKHUb6uNkBBl5aag7PeNKAWQ-cgMNygZ43nejEOCGzRbho8fQ88WgKFLStit6IR4tXXRlEJ4--4lw1l37bJW3hlaZSOgph25aWYExSWxXRw8PRtfFy3F81Es0YiWMhNXB33TjHZsEI-zYqS6oIMrNc8rpgIcBakQn4Z0Bgbi_NfV9_wlQkqxntiEEJWXRcDUxWx3coGz5AklQgrrGugN0-3NdWqgFDM4f7Gc2aAgMB2P76EK-C7ISu5fdRYqR8BVUpyPmoNOAGaYeGodDDPndnuos4m601EIvpnStxsPQhuoB_A5W1sHciLLbhH2UlZNNpz7Z3Pf_0uY5MDOHhm_1D-8AY-FmfQP9a9wNgiflq6KdLmrY2aWxTbOPLbEFdNNIAupznUiKUA8IkQ3Vs-5TstxmQx_oYk5LzDDYE_vtIY6AEEv90re-SKocRlOEc1w8Kur-3qRNL5FKW6-O9kk5UIEQqJX7rofqmid18zQxTUIWw64SjO8UYqtjFKmbRqTWs1zUhXrhfjyE4fGjkdpIIt5I_4N5Uy5rbi7lQS_tIQxZXmqFpp_jZu_wbyBcOfqM3Dkv6kftnyC1Xyo57YIKYqv4NGG13IZv7E9rromsD66SeGNU6hXhvMCf-PZ2oHwZECnx2O1pWH64JwEGmYCH1qS0pcMMA0si_Yfd7wN7nzqdUGZ4hl1H0k41J6aB-1VggtNx779IZY3c1lzomgbreUEcZtESxUBquolOPon1_JOmeO2LQQXQ4rqi0w7g_TrcTHetM48t8K1-Dhr-_reNROLpoR-YvdB3Ez318sRNFUG3r6DFZQDd198bdS0SndNiv90X_UweuAsRUdAp6_z1ExNsa7wAZlgxlEXMlcTBOmgKkuHy_tZ3khGPYVMuqOAzk9ettAlgLqnes_ypk0K0Ba_it-hA5XdmchZgh4I4HWBGMUbLoBGsuK9cJILe2eTxPc6euuTBCUaRKmhdMUqPqVt7UxIYrWbUNWQKWhDQV6kQlEKOAvDbOPqwAcqDtuchOc83uOncZNqbxW76O5lDmMtVtAOVCi88R8NRcCo3edmr2iXKMLOigHq6x-3pT5t-K-egeGa_CCknQsAeAjU35mQON7pRktFsTVkiDTgw8HBz-s7y0DPifk3v3sdxtrKLN-48M97dwyYJl22dHkpH76s-W9BHaeqzP3IeT-61pYTuY4II3n1YsjyStQM8gBsoCPEHIifMr-J1UZFIrd1FRVPGTqovEj6DwBV6q3Ne9w7yGKvoAP40sPe2cCSkHhI3mYOE1FaCzBrqOo6o8NmxDiKro3GUrMaYSBuSqJn7yzg2PhQmVzgLCWGEWRXdoTkxB9oY5ukOClXE5dk6bXDlJDTJWSqtJS4gvZ7Lxlj5HoZeihmQAtRKxazy-QRJ0cfTxkySICFcEBhafMxZ2HToGS7Gg9C5QGbcGHuLukHdejTryOWDOfuD0_YvqcQnwZ-c3nlwSibyOhO1G9xReN9TbQOaYG6HYxYmbn5BjowXjVrE5t_lpDtRB1X2iXdMg6jUBecC0CwiUT167WPeUxcWotlHzaNCZjj6IbhF45ifMgPY8Tb9U_oh8BDIHoN0RWSxKDIgJSxb-5_xfVF5t0pshjf-ElIozYGWC67o9OqFiIty4eiljfq8AsUibAmfRUVcYBPv-HMZGzRROhe90vfC85E8wLIJVU9eWTrA8jzDfhYZfKedVZwmZfNaT4UpVLjfkgOkEUldm45xUK7POc3nvhTFxWBud2W2ePsmhSz6WCUsjF6IyTCmEyhksYnrdv4gvF9j2NmrICYqSl3DJs4ALFSyQQgjchjI92knZV7sge9iOzCH-TdFg_Ya1HIVV5riiNSY9P25wF6M1UFVUGs4K9T-isCi578gakslCxjZBOIgRaxdQYbf-vOPUjOPE7Bjlf6qIv-GOK7N6eWfjSz3BVt47RBs6TioZyOPRYAL9EH3foBisoRu_yyM8xvdPgumOuSLeReqDUlf8TN-RVQblnw4MUjS2dgWfcUk3KS7syn2gePlWRUYZbmoQI9Bok5WX2H5C3Ck-2vJ4OQUg2RBJX91sCaMBy4V3UDu-OnrtlyM7zdUOr8pjcWBw5o7qaDKU-uMtAlDruMu6dMiNe8sX-h5xptS6cPh1njmpWE87J5jGTgOGsUXSKMwBr6vhN35sksZu49HfZPJjHQHvUkM5exxn2XUZK_sBwpQ6tbIlO9o82UUurnGy06RbYZ3e17ZWEZ0X4ijLMLPojJ6KjH54-SA1yNhTW2bhj3QD5doRhEuQE4p40XVGMrdjhvfnlM4P1I-UX5EqZzF_pDTwppssDxEBbLXKzIrNFerrAX3QlfevWet7dXpDk2h-dvQFl8-HjNFtSN7-jhaDCV9bbqgN3m6JXfpfQEURkCLzoOhNrHR1sCSelPmHUchhHR17TtR7HOkge9Kvr_DE3UNOSX02ZV7R5qq3zbw3m93nD4J2l6tHiYR4xb08ywSPj5Q29gDs-DnasX41TNmQ1x5cfLqDZO2nbTlq4Cz8ijVJkoOlgd6_xRf_KnQ4aVyLvPuzbeBiXcY9aClld2NT7DwNFb7_mzd04_jqaEOpRg7CUTaUtCsKCS2KM0Q_h44IUhwjKBYKKZ7BLsLlxMqfAYknrIOGfO0UAHpwnhQ7nzPKWUWNWozmnPcuiBtY5GjzNlrbxVVwIjmXvMfu2NPlcde3eonX9a7F3S8VjI1CYp6ldW576AJNYigzWMgd7-xSSq_8wK6LKBF-RcYsfI4_gh2CZvImk0-NEgmMuRhW7QPw0e8Vsd5RCY7K7RP2lWCjUyTC5yI5Gh7YB1EvTehwHC_MD_N_lF7hP8Gs-GYl4UeZH7ByQBX06Pda-yVF34F969ARJiLZPDNep-XWLj-UA2VrkyStFv65e7knDRgmjlKoumWsCXVHlOSorsY9s8cbQn3LSTaXtto2at6ORXC3EBdyr7JHveCUx5kN8ZD41FAZcb3MrCiqPcgkh8QQCup-t_ARXsGvCvcPbCtOYuDe6ePB6Ih2khBaSSjV9dnpovHlD_QrzyUi9Esyfv1aTtjukd7OnjUqaDUwOeNspZtXXBFtaXaC07cu4RqomHD42oPGsRcqc7r7YLGzXoVgG7C-IyKkgDmxDWyeeRctJ0lJJhA6057O-vyHlsEdMLsZMzMTQH4Wo6CwqmP9EhN-MSl9r4qe1ZcQlWZfTlw4oMA4hcZujPsE2T5XapfSgDwmtzYBYJRfJP6RucJ66swvvktVSz68PKDFXBebzryvAQHQAlkma2oHjfPw90NcWk1C1Aqj5ButbpaCtH579Fdj8jdDecDuWM4viYmDyHagtK-OU5Mk-MOuc2vkVUwOQg3IeeT94CJS1kKAv1XxxFJ9Af05RYRlTz4sMN4mPqOEYVee-Qf225Sm71cOm_NlIPuE_UKgsYH2rRq9LNB4jdCaQkE4z5RST1j_X3jtcCrXW6c1TxkPfGTsK7rs0MGpaIlzetlkTGbTehT8AwwfVsgjyWw1qLR1pAClf-t8Qo5M_yHlJLJL3K2yF28mE2x02AFTiXpmA3D9_XKwmf3GiGgxwpo5CQZWJ8Zu90gYK3TraYeOCVqTtZ3E5p-cgqlgGh54Au2xtRJlHO79qt4yyp_D9OP9mqo5yvW_j-dXaLEe20het7bNsBD9nHoCpUHyyOZhgPPQqwVxzwUdvPcadRUoXGBZDifbCPkJMopvsGpe-T3gfmUXcjxT03Ir1onXBImRpdr3UQDrmDE3Z_RI-cO99CORZ_Kisy038pT6Shh2fkySZSVVerjwqUFOPPrreun2HUfVybJpjYy1odc8PJfsX3n3T_ivA0Hp-cimQVAqgxs-n8M1_Uq72dzMDqGn_nInFO7bWLlOe9VoUvSbwggEZkMAeCSj-MysiY242AzdGR9wst2MMreK3BkwpsP_Xe8nGvt59ND0oq1p1huJBa-zwXkfIcWHlOKffxd-cVheuxX4"",
+                    ""tag"": ""4L72ufhEUaVHSVyITsaowg""
                 }";
             // var encrypted = Encryptor.Encrypt(sharedKey, message);
             // Console.WriteLine($"Encrypted message: {encrypted}");
@@ -41,15 +41,84 @@ public class Program
                 foreach (var vc in vcArray.EnumerateArray())
                 {
                     var vcJson = vc.GetRawText();
-                    var issuerPublicKey = "02b35b116329ad5ce292030a63deac8a75428d0029325500aac957bfdb63273746"; // Issuer public key
+                    var issuerPublicKey = "02b35b116329ad5ce292030a63deac8a75428d0029325500aac957bfdb63273746"; 
                     var vcIsValid = Verifier.VerifyProof(vcJson, issuerPublicKey);
                     Console.WriteLine($"VC signature valid: {vcIsValid}");
+                    
+                    if (vcIsValid)
+                    {
+                        Console.WriteLine("🎉 VC Proof verification successful!");
+                    }
+                    else
+                    {
+                        Console.WriteLine("❌ VC Proof verification failed!");
+                    }
                 }
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error: {ex.Message}");
+        }
+        
+        // Test specific VC verification
+        Console.WriteLine("\n=== Testing Specific VC Verification ===");
+        TestSpecificVCVerification();
+    }
+    
+    private static void TestSpecificVCVerification()
+    {
+        var vcJson = @"{
+            ""id"" : ""urn:uuid:78cdaacd-eabd-4253-bf30-535635425642"",
+            ""type"" : ""VerifiableCredential"",
+            ""validUntil"" : ""2026-10-23T08:23:20Z"",
+            ""issuer"" : ""did:nda:testnet:0xe71963787f8d5e328cd12b7a78b0d26062e1f31e"",
+            ""proof"" : {
+                ""proofPurpose"" : ""assertionMethod"",
+                ""created"" : ""2025-10-23T08:23:20Z"",
+                ""proofValue"" : ""b290788284d6c527056d436c27289c5509786d6192eff3a7fad221d52a31d1ab314b83b13775e38a4591c979eb07f5ee105a3c6701fb7b3386350f6307db077801"",
+                ""type"" : ""DataIntegrityProof"",
+                ""cryptosuite"" : ""ecdsa-rdfc-2019"",
+                ""verificationMethod"" : ""did:nda:testnet:0xe71963787f8d5e328cd12b7a78b0d26062e1f31e#key-1""
+            },
+            ""@context"" : [
+                ""https://www.w3.org/ns/credentials/v2""
+            ],
+            ""validFrom"" : ""2025-10-23T08:23:20Z"",
+            ""credentialSubject"" : {
+                ""issuer"" : ""did:nda:testnet:0xe71963787f8d5e328cd12b7a78b0d26062e1f31e"",
+                ""citizenIdentify"" : ""035187003000"",
+                ""result"" : ""matched"",
+                ""id"" : ""did:nda:testnet:0x3b5a8585b78628410530014c094abb86f6b33cdd"",
+                ""issuedBy"" : ""Viettel"",
+                ""issuedDate"" : ""2025-10-23"",
+                ""phoneNumber"" : ""0972000331""
+            }
+        }";
+        
+        var publicKey = "02b35b116329ad5ce292030a63deac8a75428d0029325500aac957bfdb63273746";
+        
+        try
+        {
+            Console.WriteLine($"VC JSON: {vcJson}");
+            Console.WriteLine($"Public Key: {publicKey}");
+            
+            var vcIsValid = Verifier.VerifyProof(vcJson, publicKey);
+            Console.WriteLine($"\n✅ VC signature valid: {vcIsValid}");
+            
+            if (vcIsValid)
+            {
+                Console.WriteLine("🎉 VC Proof verification successful!");
+            }
+            else
+            {
+                Console.WriteLine("❌ VC Proof verification failed!");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error verifying VC: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
         }
     }
 }
