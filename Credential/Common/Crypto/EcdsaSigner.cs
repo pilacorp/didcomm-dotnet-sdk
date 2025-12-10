@@ -33,12 +33,8 @@ public static class EcdsaSigner
             var signer = new ECDsaSigner();
             signer.Init(true, privKey);
 
-            // Hash message with SHA256
-            using var sha256 = SHA256.Create();
-            var messageHash = sha256.ComputeHash(message);
-
             // Sign
-            var signature = signer.GenerateSignature(messageHash);
+            var signature = signer.GenerateSignature(message);
 
             // Convert to 65-byte format [r, s, v]
             var r = signature[0].ToByteArrayUnsigned();
