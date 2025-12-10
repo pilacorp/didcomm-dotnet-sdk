@@ -538,3 +538,4 @@ FodyWeavers.xsd
 # JetBrains Rider
 .idea/
 *.sln.iml
+obj/project.nuget.cache
