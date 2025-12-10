@@ -47,7 +47,7 @@ public static class Canonicalizer
     /// Canonicalizes a JSON document excluding the proof field using RDFC-1.0 algorithm.
     /// Returns the canonicalized N-Quads bytes ready for hashing/signing.
     /// </summary>
-    public static byte[] CanonicalizeWithoutProof(Dictionary<string, object> document)
+    public static byte[] CanonicalizeWithoutProof(Dictionary<string, object?> document)
     {
         if (document == null)
         {
@@ -55,7 +55,7 @@ public static class Canonicalizer
         }
 
         // Create a copy without the proof field
-        var documentCopy = new Dictionary<string, object>();
+        var documentCopy = new Dictionary<string, object?>();
         foreach (var kvp in document)
         {
             if (kvp.Key != "proof")

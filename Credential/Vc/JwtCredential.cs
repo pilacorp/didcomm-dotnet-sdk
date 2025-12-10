@@ -174,11 +174,14 @@ public class JwtCredential : ICredential
     /// </summary>
     public void AddProof(string privateKeyHex, params CredentialOpt[] opts)
     {
+        // Hash the signing input
+        var hashMessage = Canonicalizer.ComputeDigest(Encoding.UTF8.GetBytes(_signingInput));
+
         // Sign the existing signing input
-        var signature = EcdsaSigner.SignStringBase64Url(_signingInput, privateKeyHex);
+        var signature = EcdsaSigner.Sign(hashMessage, privateKeyHex);
 
         // Update signature
-        _signature = signature;
+        _signature = Util.Base64UrlEncode(signature);
     }
 
     /// <summary>
@@ -213,14 +216,12 @@ public class JwtCredential : ICredential
     /// </summary>
     public void Verify(params CredentialOpt[] opts)
     {
-        var options = Credential.GetOptions(opts);
-        options.IsVerifyProof = true;
+        var optList = new List<CredentialOpt>(opts)
+        {
+            CredentialOpts.WithVerifyProof()
+        };
 
-        // TODO: Implement JWT verification
-        // This would require:
-        // 1. Decoding the header to get the kid
-        // 2. Resolving the public key from the DID
-        // 3. Verifying the signature
+        ExecuteOptions(optList.ToArray());
     }
 
     /// <summary>
@@ -336,7 +337,8 @@ public class JwtCredential : ICredential
         // Verify signature
         // The message to verify is the signing input (header.payload)
         var messageBytes = Encoding.UTF8.GetBytes(_signingInput);
-        var isValid = EcdsaVerifier.VerifySignature(publicKeyHex, signatureHex, messageBytes);
+        var hashMessage = Canonicalizer.ComputeDigest(messageBytes);
+        var isValid = EcdsaVerifier.VerifySignature(publicKeyHex, signatureHex, hashMessage);
 
         if (!isValid)
         {
