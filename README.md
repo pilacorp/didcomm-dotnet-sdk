@@ -113,6 +113,63 @@ DataIntegrityProof signature format validated
 VC signature valid: True
 ```
 
+## Ví dụ xử lý Verifiable Credential
+
+Đoạn mã dưới đây minh họa cùng luồng với `TestCredential.cs`: parse VC dạng JSON, parse VC dạng JWT, và tạo VC JSON/JWT rồi ký bằng khóa riêng, xem chi tiết tại [TestCredential.cs](TestCredential.cs). (Schema validation hiện **chưa được triển khai**; bật `WithSchemaValidation` sẽ trả lỗi `NotImplementedException`.)
+
+```csharp
+using System.Text;
+using Pila.CredentialSdk.DidComm.Credential.Vc;
+
+CredentialConfig.Init("https://auth-dev.pila.vn/api/v1/did");
+
+// Parse + verify JSON VC
+var rawJsonVc = /* JSON VC string */;
+var jsonVc = Credential.ParseCredential(Encoding.UTF8.GetBytes(rawJsonVc));
+jsonVc.Verify();
+
+// Parse + verify JWT VC
+var rawJwtVc = /* JWT VC string */;
+var jwtVc = Credential.ParseCredential(Encoding.UTF8.GetBytes(rawJwtVc));
+jwtVc.Verify();
+
+// Create JSON VC and add proof
+var contents = new CredentialContents
+{
+    Context = new List<object>
+    {
+        "https://www.w3.org/ns/credentials/v2",
+        "https://www.w3.org/ns/credentials/examples/v2"
+    },
+    Types = new List<string> { "VerifiableCredential" },
+    Issuer = "did:example:issuer",
+    Subject = new List<Subject>
+    {
+        new Subject
+        {
+            Id = "did:example:subject1",
+            CustomFields = new Dictionary<string, object>
+            {
+                ["name"] = "Alice",
+                ["age"] = 10,
+                ["salary"] = 50000
+            }
+        }
+    }
+};
+
+const string privKeyHex = "e5c9a597b20e13627a3850d38439b61ec9ee7aefd77c7cb6c01dc3866e1db19a";
+
+var createdJsonVc = JsonCredential.NewJsonCredential(contents);
+createdJsonVc.AddProof(privKeyHex);
+createdJsonVc.Verify();
+
+// Create JWT VC and add proof
+var createdJwtVc = JwtCredential.NewJwtCredential(contents);
+createdJwtVc.AddProof(privKeyHex);
+createdJwtVc.Verify();
+```
+
 ## API Reference
 
 ### Ecdh.GetFromKeys(senderPubHex, receiverPrivHex)
