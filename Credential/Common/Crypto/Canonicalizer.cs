@@ -1,5 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
@@ -16,19 +18,118 @@ namespace Pila.CredentialSdk.DidComm.Credential.Common.Crypto;
 /// </summary>
 public static class Canonicalizer
 {
-    private static RemoteDocument LoadCredentialsV2Context(Uri uri)
+    // Well-known W3C context URLs mapped to their local file names
+    private static readonly Dictionary<string, string> WellKnownContexts = new()
+    {
+        { "https://www.w3.org/ns/credentials/v2", "w3c.credential.v2.json" },
+        { "https://www.w3.org/ns/credentials/v2.jsonld", "w3c.credential.v2.json" },
+        { "https://www.w3.org/ns/credentials/examples/v2", "w3c.credential.examples.v2.json" },
+        { "https://www.w3.org/ns/credentials/examples/v2.jsonld", "w3c.credential.examples.v2.json" }
+    };
+
+    /// <summary>
+    /// Canonicalizes a JSON document excluding the proof field using RDFC-1.0 algorithm.
+    /// Returns the canonicalized N-Quads bytes ready for hashing/signing.
+    /// </summary>
+    /// <param name="document">The document to canonicalize</param>
+    /// <returns>Canonicalized N-Quads as UTF-8 bytes</returns>
+    /// <exception cref="ArgumentNullException">Thrown when document is null</exception>
+    public static byte[] CanonicalizeWithoutProof(Dictionary<string, object?> document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        var documentWithoutProof = RemoveProofField(document);
+        var standardized = CredentialHelper.StandardizeToJsonLd(documentWithoutProof);
+        var jsonString = JsonSerializer.Serialize(standardized);
+
+        var options = CreateJsonLdOptions();
+        var store = ParseJsonLdToRdf(jsonString, options);
+        
+        var canonicalizer = new RdfCanonicalizer();
+        var canonicalized = canonicalizer.Canonicalize(store);
+
+        return Encoding.UTF8.GetBytes(canonicalized.SerializedNQuads);
+    }
+
+    /// <summary>
+    /// Computes the SHA-256 digest of the canonicalized document.
+    /// </summary>
+    /// <param name="canonicalizedData">The canonicalized data to hash</param>
+    /// <returns>SHA-256 hash bytes</returns>
+    /// <exception cref="ArgumentNullException">Thrown when canonicalizedData is null</exception>
+    public static byte[] ComputeDigest(byte[] canonicalizedData)
+    {
+        ArgumentNullException.ThrowIfNull(canonicalizedData);
+
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        return sha256.ComputeHash(canonicalizedData);
+    }
+
+    private static Dictionary<string, object?> RemoveProofField(Dictionary<string, object?> document)
+    {
+        return document
+            .Where(kvp => kvp.Key != "proof")
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+    }
+
+    private static JsonLdProcessorOptions CreateJsonLdOptions()
+    {
+        return new JsonLdProcessorOptions
+        {
+            ProcessingMode = JsonLdProcessingMode.JsonLd11,
+            DocumentLoader = (uri, loaderOptions) =>
+            {
+                var url = uri.ToString();
+
+                // Check if this is a well-known context that should be loaded locally
+                if (WellKnownContexts.TryGetValue(url, out var localFileName))
+                {
+                    return LoadLocalContext(uri, localFileName, loaderOptions);
+                }
+
+                // Fallback to default loader (network) for unknown contexts
+                return DefaultDocumentLoader.LoadJson(uri, loaderOptions);
+            }
+        };
+    }
+
+    private static TripleStore ParseJsonLdToRdf(string jsonString, JsonLdProcessorOptions options)
+    {
+        var store = new TripleStore();
+        var parser = new JsonLdParser(options);
+        using var reader = new StringReader(jsonString);
+        parser.Load(store, reader);
+        return store;
+    }
+
+    private static RemoteDocument LoadLocalContext(Uri uri, string localFileName, JsonLdLoaderOptions loaderOptions)
+    {
+        var filePath = GetSearchPaths(localFileName).FirstOrDefault(File.Exists);
+        
+        if (filePath != null)
+        {
+            return LoadContextFromFile(uri, filePath);
+        }
+
+        // File not found locally, fallback to network
+        return DefaultDocumentLoader.LoadJson(uri, loaderOptions);
+    }
+
+    private static IEnumerable<string> GetSearchPaths(string fileName)
+    {
+        return new[]
+        {
+            fileName,
+            $"Credential\\Common\\Crypto\\{fileName}",
+            $"Credential/Common/Crypto/{fileName}"
+        };
+    }
+
+    private static RemoteDocument LoadContextFromFile(Uri uri, string filePath)
     {
         try
         {
-            var assembly = typeof(Canonicalizer).Assembly;
-            // Adjust namespace + path to your actual project structure
-            const string resourceName = "Pila.CredentialSdk.DidComm.Credential.Common.Crypto.CredentialsV2.json";
-
-            using var stream = assembly.GetManifestResourceStream(resourceName)
-                ?? throw new FileNotFoundException($"Embedded resource '{resourceName}' not found.");
-
-            using var reader = new StreamReader(stream);
-            var jsonContent = reader.ReadToEnd();
+            var jsonContent = File.ReadAllText(filePath);
             var jsonObject = JObject.Parse(jsonContent);
 
             return new RemoteDocument
@@ -39,79 +140,8 @@ public static class Canonicalizer
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Failed to load embedded CredentialsV2 context: {ex.Message}", ex);
+            throw new InvalidOperationException(
+                $"Failed to load local context file '{filePath}': {ex.Message}", ex);
         }
-    }
-
-    /// <summary>
-    /// Canonicalizes a JSON document excluding the proof field using RDFC-1.0 algorithm.
-    /// Returns the canonicalized N-Quads bytes ready for hashing/signing.
-    /// </summary>
-    public static byte[] CanonicalizeWithoutProof(Dictionary<string, object?> document)
-    {
-        if (document == null)
-        {
-            throw new ArgumentNullException(nameof(document));
-        }
-
-        // Create a copy without the proof field
-        var documentCopy = new Dictionary<string, object?>();
-        foreach (var kvp in document)
-        {
-            if (kvp.Key != "proof")
-            {
-                documentCopy[kvp.Key] = kvp.Value;
-            }
-        }
-
-        // Standardize the document to JSON-LD-friendly strings
-        var standardized = CredentialHelper.StandardizeToJsonLd(documentCopy);
-
-        // Convert Dictionary to JSON string
-        var jsonString = JsonSerializer.Serialize(standardized);
-
-        // Configure JsonLdParser with custom document loader that handles remote context loading
-        var options = new JsonLdProcessorOptions
-        {
-            ProcessingMode = JsonLdProcessingMode.JsonLd11,
-            DocumentLoader = (uri, loaderOptions) =>
-            {
-                // Try to load from local first
-                if (uri.ToString() == "https://www.w3.org/ns/credentials/v2")
-                {
-                    return LoadCredentialsV2Context(uri);
-                }
-                return DefaultDocumentLoader.LoadJson(uri, loaderOptions);
-            }
-        };
-
-        // Parse JSON-LD into RDF TripleStore using TextReader
-        var store = new TripleStore();
-        var parser = new JsonLdParser(options);
-        using (var reader = new StringReader(jsonString))
-        {
-            parser.Load(store, reader);
-        }
-
-        // Canonicalize using RDFC-1.0 algorithm
-        var canonicalizer = new RdfCanonicalizer();
-        var canonicalized = canonicalizer.Canonicalize(store);
-
-        // Return canonicalized N-Quads as bytes
-        return Encoding.UTF8.GetBytes(canonicalized.SerializedNQuads);
-    }
-
-    /// <summary>
-    /// Computes the SHA-256 digest of the canonicalized document.
-    /// </summary>
-    public static byte[] ComputeDigest(byte[] canonicalizedData)
-    {
-        if (canonicalizedData == null)
-        {
-            throw new ArgumentNullException(nameof(canonicalizedData));
-        }
-
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        return sha256.ComputeHash(canonicalizedData);
     }
 }
