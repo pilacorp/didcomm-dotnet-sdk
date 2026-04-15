@@ -7,7 +7,7 @@ namespace Pila.CredentialSdk.DidComm.Jwe;
 
 public static class JweBuilder
 {
-    public static string BuildJwe(byte[] sharedKey, byte[] iv, byte[] ciphertext)
+    public static string BuildJwe(byte[] iv, byte[] ciphertext, byte[] tag)
     {
         var header = new
         {
@@ -16,17 +16,17 @@ public static class JweBuilder
             crv = "secp256k1",
             typ = "application/didcomm-encrypted+json"
         };
-        
+
         var headerBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(header));
-        
+
         var jwe = new JweModel
         {
             Protected = Base64UrlEncode(headerBytes),
             Iv = Base64UrlEncode(iv),
             Ciphertext = Base64UrlEncode(ciphertext),
-            Tag = Base64UrlEncode(sharedKey[..16]) // mock tag for compatibility
+            Tag = Base64UrlEncode(tag)
         };
-        
+
         return JsonConvert.SerializeObject(jwe, Formatting.Indented);
     }
     

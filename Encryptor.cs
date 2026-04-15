@@ -9,8 +9,8 @@ public static class Encryptor
     public static string Encrypt(byte[] key, string plaintext)
     {
         var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
-        var (nonce, ciphertext) = AesGcmHelper.EncryptAesGcm(key, plaintextBytes);
-        
-        return JweBuilder.BuildJwe(key[..16], nonce, ciphertext);
+        var (nonce, ciphertext, tag) = AesGcmHelper.EncryptAesGcm(key, plaintextBytes);
+
+        return JweBuilder.BuildJwe(nonce, ciphertext, tag);
     }
 }
