@@ -24,43 +24,45 @@ public static class Decryptor
 {
     public static string DecryptJwe(string jweStr, byte[] sharedKey)
     {
+        // Parse JWE JSON
+        var jwe = JsonConvert.DeserializeObject<JWE>(jweStr);
+        if (jwe == null)
+            throw new ArgumentException("Invalid JWE format");
+
+        // Decode base64url
+        var iv = Base64UrlDecode(jwe.IV);
+        var ciphertext = Base64UrlDecode(jwe.Ciphertext);
+        var tag = Base64UrlDecode(jwe.Tag);
+
+        // Try decrypt with tag from JWE field (new format with real tag)
         try
         {
-            // Parse JWE JSON - same as Go json.Unmarshal
-            var jwe = JsonConvert.DeserializeObject<JWE>(jweStr);
-            if (jwe == null)
-                throw new ArgumentException("Invalid JWE format");
-
-            // Decode base64url - same as Go base64urlDecode
-            var iv = Base64UrlDecode(jwe.IV);
-            var ciphertext = Base64UrlDecode(jwe.Ciphertext);
-
-            // Debug output removed for cleaner output
-
-            // Create GCM - same as Go cipher.NewGCM
-            using var gcm = new AesGcm(sharedKey, 16); // 16 bytes tag size
-            
-            // Decrypt - same as Go gcm.Open(nil, iv, ciphertext, nil)
-            // In Go, ciphertext already includes the tag at the end
-            // JWE tag field is just mock (sharedKey[:16])
-            var plaintext = new byte[ciphertext.Length - 16]; // Remove 16-byte tag
-            var tag = new byte[16];
-            
-            // Extract tag from end of ciphertext (Go GCM stores tag at end)
-            Array.Copy(ciphertext, ciphertext.Length - 16, tag, 0, 16);
-            var actualCiphertext = new byte[ciphertext.Length - 16];
-            Array.Copy(ciphertext, 0, actualCiphertext, 0, actualCiphertext.Length);
-
-            // Debug output removed for cleaner output
-
-            gcm.Decrypt(iv, actualCiphertext, tag, plaintext);
-            
+            using var gcm = new AesGcm(sharedKey, 16);
+            var plaintext = new byte[ciphertext.Length];
+            gcm.Decrypt(iv, ciphertext, tag, plaintext);
             return Encoding.UTF8.GetString(plaintext);
         }
-        catch (Exception ex)
+        catch
         {
-            throw new InvalidOperationException($"Decryption failed: {ex.Message}", ex);
+            // Fallback: extract tag from end of ciphertext (old format with mock tag)
+            return DecryptWithTagFromCiphertext(iv, ciphertext, sharedKey);
         }
+    }
+
+    private static string DecryptWithTagFromCiphertext(byte[] iv, byte[] ciphertext, byte[] sharedKey)
+    {
+        using var gcm = new AesGcm(sharedKey, 16);
+
+        // Extract tag from end of ciphertext (old Go GCM format)
+        var tag = new byte[16];
+        Array.Copy(ciphertext, ciphertext.Length - 16, tag, 0, 16);
+        var actualCiphertext = new byte[ciphertext.Length - 16];
+        Array.Copy(ciphertext, 0, actualCiphertext, 0, actualCiphertext.Length);
+
+        var plaintext = new byte[actualCiphertext.Length];
+        gcm.Decrypt(iv, actualCiphertext, tag, plaintext);
+
+        return Encoding.UTF8.GetString(plaintext);
     }
     
     private static byte[] Base64UrlDecode(string input)
