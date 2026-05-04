@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Pila.CredentialSdk.DidComm.Credential.Common.Crypto;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.Signer;
 using Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 
 namespace Pila.CredentialSdk.DidComm.Credential.Common.JsonMap;
@@ -72,7 +73,7 @@ public class JsonMap : Dictionary<string, object>
         var encoded = JsonSerializer.SerializeToUtf8Bytes(mCopy);
         
         // Deserialize to ensure proper format
-        var doc = JsonSerializer.Deserialize<Dictionary<string, object>>(encoded);
+        var doc = JsonSerializer.Deserialize<Dictionary<string, object?>>(encoded);
         if (doc == null)
         {
             throw new InvalidOperationException("Failed to unmarshal JSONMap copy");
@@ -88,8 +89,26 @@ public class JsonMap : Dictionary<string, object>
     /// <summary>
     /// Adds an ECDSA proof to the JSONMap.
     /// </summary>
+    [Obsolete("Use AddECDSAProofByProvider(ISignerProvider, ...) instead.")]
     public void AddECDSAProof(string privateKeyHex, string verificationMethod, string proofPurpose, string didBaseUrl)
     {
+        // Keep legacy behavior: validate the private key matches the verification method.
+        var resolver = new VerificationMethodResolver(didBaseUrl);
+        var isValid = resolver.CheckVerificationMethodAsync(privateKeyHex, verificationMethod).GetAwaiter().GetResult();
+        if (!isValid)
+        {
+            throw new InvalidOperationException("private key and verification method do not match");
+        }
+
+        AddECDSAProofByProvider(new DefaultSignerProvider(privateKeyHex), verificationMethod, proofPurpose);
+    }
+
+    public void AddECDSAProofByProvider(ISignerProvider signerProvider, string verificationMethod, string proofPurpose)
+    {
+        if (signerProvider == null)
+        {
+            throw new ArgumentNullException(nameof(signerProvider));
+        }
         if (string.IsNullOrEmpty(verificationMethod))
         {
             throw new ArgumentException("verification method is required");
@@ -97,14 +116,6 @@ public class JsonMap : Dictionary<string, object>
         if (string.IsNullOrEmpty(proofPurpose))
         {
             throw new ArgumentException("proof purpose is required");
-        }
-
-        // Verify private key matches verification method
-        var resolver = new VerificationMethodResolver(didBaseUrl);
-        var isValid = resolver.CheckVerificationMethodAsync(privateKeyHex, verificationMethod).GetAwaiter().GetResult();
-        if (!isValid)
-        {
-            throw new InvalidOperationException("private key and verification method do not match");
         }
 
         var proof = new Proof
@@ -117,9 +128,12 @@ public class JsonMap : Dictionary<string, object>
         };
 
         var signData = Canonicalize();
-        var signature = EcdsaSigner.Sign(signData, privateKeyHex);
-        proof.ProofValue = Convert.ToHexString(signature).ToLowerInvariant();
+        SignerProviderUtil.EnsureDigest32(signData);
 
+        var signature = signerProvider.Sign(signData);
+        SignerProviderUtil.EnsureSignatureLength(signature);
+
+        proof.ProofValue = Convert.ToHexString(signature).ToLowerInvariant();
         this["proof"] = SerializeProof(proof);
     }
 
@@ -468,4 +482,3 @@ public class JsonMap : Dictionary<string, object>
         return Convert.FromBase64String(base64);
     }
 }
-

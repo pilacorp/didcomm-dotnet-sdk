@@ -139,7 +139,8 @@ public class Program
         try
         {
             var credential = JsonCredential.NewJsonCredential(credentialContents);
-            credential.AddProof(privateKeyHex);
+            var signerProvider = new Pila.CredentialSdk.DidComm.Credential.Common.Signer.DefaultSignerProvider(privateKeyHex);
+            credential.AddProofByProvider(signerProvider);
             credential.Verify();
             Console.WriteLine("Verification: SUCCESS");
         }
@@ -157,7 +158,8 @@ public class Program
         try
         {
             var credential = JwtCredential.NewJwtCredential(credentialContents);
-            credential.AddProof(privateKeyHex);
+            var signerProvider = new Pila.CredentialSdk.DidComm.Credential.Common.Signer.DefaultSignerProvider(privateKeyHex);
+            credential.AddProofByProvider(signerProvider);
             credential.Verify();
             Console.WriteLine("Verification: SUCCESS");
         }

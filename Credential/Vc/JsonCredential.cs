@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.Signer;
 using Pila.CredentialSdk.DidComm.Credential.Vc;
 using JsonMapType = Pila.CredentialSdk.DidComm.Credential.Common.JsonMap.JsonMap;
 
@@ -75,9 +76,23 @@ public class JsonCredential : ICredential
     /// <summary>
     /// Adds an ECDSA proof to the credential.
     /// </summary>
+    [Obsolete("Use AddProofByProvider(ISignerProvider, ...) instead.")]
     public void AddProof(string privateKeyHex, params CredentialOpt[] opts)
     {
+        AddProofByProvider(new DefaultSignerProvider(privateKeyHex), opts);
+    }
+
+    /// <summary>
+    /// Adds an ECDSA proof to the credential using a signer provider.
+    /// </summary>
+    public void AddProofByProvider(ISignerProvider signerProvider, params CredentialOpt[] opts)
+    {
         var options = Credential.GetOptions(opts);
+
+        if (signerProvider == null)
+        {
+            throw new ArgumentNullException(nameof(signerProvider));
+        }
 
         if (!_jsonMap.TryGetValue("issuer", out var issuerObj) || issuerObj == null)
         {
@@ -87,8 +102,7 @@ public class JsonCredential : ICredential
         var issuer = issuerObj.ToString()!;
         var verificationMethod = $"{issuer}#{_verificationMethod}";
 
-        // Use JsonMap to add proof
-        _jsonMap.AddECDSAProof(privateKeyHex, verificationMethod, "assertionMethod", options.DidBaseUrl);
+        _jsonMap.AddECDSAProofByProvider(signerProvider, verificationMethod, "assertionMethod");
     }
 
     /// <summary>
@@ -186,4 +200,3 @@ public class JsonCredential : ICredential
         }
     }
 }
-

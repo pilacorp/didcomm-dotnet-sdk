@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Pila.CredentialSdk.DidComm.Credential.Common.Crypto;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.Signer;
 using Pila.CredentialSdk.DidComm.Credential.Common.Util;
 using Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 using Pila.CredentialSdk.DidComm.Credential.Vc;
@@ -172,16 +173,30 @@ public class JwtCredential : ICredential
     /// <summary>
     /// Adds a proof (signature) to the JWT credential.
     /// </summary>
+    [Obsolete("Use AddProofByProvider(ISignerProvider, ...) instead.")]
     public void AddProof(string privateKeyHex, params CredentialOpt[] opts)
     {
-        // Hash the signing input
+        AddProofByProvider(new DefaultSignerProvider(privateKeyHex), opts);
+    }
+
+    /// <summary>
+    /// Adds a proof (signature) to the JWT credential using a signer provider.
+    /// </summary>
+    public void AddProofByProvider(ISignerProvider signerProvider, params CredentialOpt[] opts)
+    {
+        if (signerProvider == null)
+        {
+            throw new ArgumentNullException(nameof(signerProvider));
+        }
+
+        // Hash the signing input (always 32-byte digest)
         var hashMessage = Canonicalizer.ComputeDigest(Encoding.UTF8.GetBytes(_signingInput));
+        SignerProviderUtil.EnsureDigest32(hashMessage);
 
-        // Sign the existing signing input
-        var signature = EcdsaSigner.Sign(hashMessage, privateKeyHex);
+        var signature = signerProvider.Sign(hashMessage);
+        var jwtSig64 = SignerProviderUtil.NormalizeTo64(signature);
 
-        // Update signature
-        _signature = Util.Base64UrlEncode(signature);
+        _signature = Util.Base64UrlEncode(jwtSig64);
     }
 
     /// <summary>
@@ -346,4 +361,3 @@ public class JwtCredential : ICredential
         }
     }
 }
-

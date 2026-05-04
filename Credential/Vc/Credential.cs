@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.Signer;
 using JsonMapType = Pila.CredentialSdk.DidComm.Credential.Common.JsonMap.JsonMap;
 
 namespace Pila.CredentialSdk.DidComm.Credential.Vc;
@@ -148,7 +149,13 @@ public interface ICredential
     /// <summary>
     /// Adds a proof to the credential using a private key.
     /// </summary>
+    [Obsolete("Use AddProofByProvider(ISignerProvider, ...) instead.")]
     void AddProof(string privateKeyHex, params CredentialOpt[] opts);
+
+    /// <summary>
+    /// Adds a proof to the credential using a signer provider.
+    /// </summary>
+    void AddProofByProvider(ISignerProvider signerProvider, params CredentialOpt[] opts);
 
     /// <summary>
     /// Gets the signing input (canonicalized document without proof).
@@ -339,4 +346,3 @@ public static class Credential
         return regex.IsMatch(valStr);
     }
 }
-

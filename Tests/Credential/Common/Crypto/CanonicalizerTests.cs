@@ -37,7 +37,7 @@ public class CanonicalizerTests
     [Fact]
     public void CanonicalizeWithoutProof_MatchesExpectedNQuads()
     {
-        var document = JsonSerializer.Deserialize<Dictionary<string, object>>(CredentialJson)!;
+        var document = JsonSerializer.Deserialize<Dictionary<string, object?>>(CredentialJson)!;
 
         var canonicalized = Canonicalizer.CanonicalizeWithoutProof(document);
         var canonicalString = Encoding.UTF8.GetString(canonicalized);
