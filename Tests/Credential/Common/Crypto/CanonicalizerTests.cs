@@ -49,4 +49,26 @@ public class CanonicalizerTests
 
         Assert.Equal(Normalize(expected), Normalize(canonicalString));
     }
+
+    [Fact]
+    public void CanonicalizeWithoutProof_WithNullValues_IsDeterministic()
+    {
+        const string jsonWithNull = @"{
+            ""@context"": [""https://www.w3.org/ns/credentials/v2""],
+            ""id"": ""urn:uuid:null-test"",
+            ""type"": ""VerifiableCredential"",
+            ""issuer"": ""did:example:issuer"",
+            ""credentialSubject"": {
+                ""id"": ""did:example:subject1"",
+                ""name"": null
+            }
+        }";
+
+        var document = JsonSerializer.Deserialize<Dictionary<string, object?>>(jsonWithNull)!;
+
+        var a = Canonicalizer.CanonicalizeWithoutProof(document);
+        var b = Canonicalizer.CanonicalizeWithoutProof(document);
+
+        Assert.Equal(Encoding.UTF8.GetString(a), Encoding.UTF8.GetString(b));
+    }
 }

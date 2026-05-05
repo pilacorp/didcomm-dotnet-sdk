@@ -94,7 +94,11 @@ public class JsonMap : Dictionary<string, object>
     {
         // Keep legacy behavior: validate the private key matches the verification method.
         var resolver = new VerificationMethodResolver(didBaseUrl);
-        var isValid = resolver.CheckVerificationMethodAsync(privateKeyHex, verificationMethod).GetAwaiter().GetResult();
+        // Legacy sync wrapper blocks on async I/O. Prefer AddECDSAProofByProvider with external key validation.
+        var isValid = resolver.CheckVerificationMethodAsync(privateKeyHex, verificationMethod)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .GetResult();
         if (!isValid)
         {
             throw new InvalidOperationException("private key and verification method do not match");
