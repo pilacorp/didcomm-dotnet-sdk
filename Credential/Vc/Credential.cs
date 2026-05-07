@@ -155,6 +155,10 @@ public interface ICredential
     /// <summary>
     /// Adds a proof to the credential using a signer provider.
     /// </summary>
+    /// <remarks>
+    /// The provider is passed a 32-byte digest computed by the SDK and should return a 64- or 65-byte ECDSA
+    /// signature (R||S or R||S||V). Concrete credential formats may normalize or encode signatures differently.
+    /// </remarks>
     void AddProofByProvider(ISignerProvider signerProvider, params CredentialOpt[] opts);
 
     /// <summary>

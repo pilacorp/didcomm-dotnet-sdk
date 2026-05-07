@@ -12,6 +12,13 @@ public sealed class DefaultSignerProvider : ISignerProvider
 {
     private readonly string _privateKeyHex;
 
+    /// <summary>
+    /// Creates a DefaultSignerProvider from a hex-encoded secp256k1 private key.
+    /// </summary>
+    /// <param name="privateKeyHex">
+    /// Hex private key. The value may include or omit the <c>0x</c> prefix.
+    /// </param>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="privateKeyHex"/> is null or empty.</exception>
     public DefaultSignerProvider(string privateKeyHex)
     {
         if (string.IsNullOrWhiteSpace(privateKeyHex))
@@ -22,6 +29,12 @@ public sealed class DefaultSignerProvider : ISignerProvider
         _privateKeyHex = privateKeyHex;
     }
 
+    /// <summary>
+    /// Signs a 32-byte digest using the configured private key.
+    /// </summary>
+    /// <remarks>
+    /// Returns either 64 or 65 bytes. See <see cref="ISignerProvider"/> contract for details.
+    /// </remarks>
     public byte[] Sign(byte[] digest32)
     {
         SignerProviderUtil.EnsureDigest32(digest32);
@@ -31,4 +44,3 @@ public sealed class DefaultSignerProvider : ISignerProvider
         return signature;
     }
 }
-

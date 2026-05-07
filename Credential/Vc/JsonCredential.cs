@@ -85,6 +85,11 @@ public class JsonCredential : ICredential
     /// <summary>
     /// Adds an ECDSA proof to the credential using a signer provider.
     /// </summary>
+    /// <remarks>
+    /// The SDK computes a 32-byte digest (canonicalized document without proof, then SHA-256) and asks the
+    /// <paramref name="signerProvider"/> to sign it. The provider may return 64 bytes (R||S) or 65 bytes
+    /// (R||S||V); both are accepted and stored as hex in <c>proof.proofValue</c>.
+    /// </remarks>
     public void AddProofByProvider(ISignerProvider signerProvider, params CredentialOpt[] opts)
     {
         var options = Credential.GetOptions(opts);

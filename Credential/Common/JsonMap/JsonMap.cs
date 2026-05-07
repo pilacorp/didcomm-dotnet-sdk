@@ -107,6 +107,22 @@ public class JsonMap : Dictionary<string, object>
         AddECDSAProofByProvider(new DefaultSignerProvider(privateKeyHex), verificationMethod, proofPurpose);
     }
 
+    /// <summary>
+    /// Adds an ECDSA proof to the JSONMap using a signer provider.
+    /// </summary>
+    /// <remarks>
+    /// Contract:
+    /// <list type="bullet">
+    /// <item>The SDK computes a 32-byte digest (canonicalized document without proof, then SHA-256).</item>
+    /// <item>The digest (32 bytes) is passed to <paramref name="signerProvider"/>.</item>
+    /// <item>The provider may return 64 bytes (R||S) or 65 bytes (R||S||V). Both are accepted.</item>
+    /// <item>The signature bytes are stored as hex in <c>proof.proofValue</c> without normalization.</item>
+    /// </list>
+    ///
+    /// This method does not validate that <paramref name="verificationMethod"/> matches the signer's key.
+    /// If you need key↔verificationMethod validation, do it externally or use the legacy
+    /// <see cref="AddECDSAProof(string,string,string,string)"/> wrapper (deprecated).
+    /// </remarks>
     public void AddECDSAProofByProvider(ISignerProvider signerProvider, string verificationMethod, string proofPurpose)
     {
         if (signerProvider == null)

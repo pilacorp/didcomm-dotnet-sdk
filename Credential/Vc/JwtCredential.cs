@@ -182,6 +182,15 @@ public class JwtCredential : ICredential
     /// <summary>
     /// Adds a proof (signature) to the JWT credential using a signer provider.
     /// </summary>
+    /// <remarks>
+    /// Contract:
+    /// <list type="bullet">
+    /// <item>The SDK computes a 32-byte SHA-256 digest of the JWT signing input (header.payload).</item>
+    /// <item>The digest is passed to <paramref name="signerProvider"/>.</item>
+    /// <item>The provider may return 64 bytes (R||S) or 65 bytes (R||S||V).</item>
+    /// <item>JWT requires 64-byte signatures, so the SDK normalizes 65 bytes down to 64 by dropping V.</item>
+    /// </list>
+    /// </remarks>
     public void AddProofByProvider(ISignerProvider signerProvider, params CredentialOpt[] opts)
     {
         if (signerProvider == null)

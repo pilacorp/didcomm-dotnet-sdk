@@ -1,7 +1,13 @@
 namespace Pila.CredentialSdk.DidComm.Credential.Common.Signer;
 
+/// <summary>
+/// Internal helpers enforcing the <see cref="ISignerProvider"/> contract.
+/// </summary>
 internal static class SignerProviderUtil
 {
+    /// <summary>
+    /// Ensures the SDK digest is exactly 32 bytes.
+    /// </summary>
     public static void EnsureDigest32(byte[] digest32)
     {
         if (digest32 == null)
@@ -14,6 +20,9 @@ internal static class SignerProviderUtil
         }
     }
 
+    /// <summary>
+    /// Ensures a signature is either 64 bytes (R||S) or 65 bytes (R||S||V).
+    /// </summary>
     public static void EnsureSignatureLength(byte[] signature)
     {
         if (signature == null)
@@ -30,6 +39,13 @@ internal static class SignerProviderUtil
         }
     }
 
+    /// <summary>
+    /// Normalizes a 65-byte signature (R||S||V) down to 64 bytes (R||S).
+    /// </summary>
+    /// <remarks>
+    /// JWT proofs use the 64-byte R||S form. The SDK accepts 65-byte signatures
+    /// from providers and will drop the trailing recovery byte when present.
+    /// </remarks>
     public static byte[] NormalizeTo64(byte[] signature)
     {
         EnsureSignatureLength(signature);
@@ -43,4 +59,3 @@ internal static class SignerProviderUtil
         return signature.Take(64).ToArray();
     }
 }
-
