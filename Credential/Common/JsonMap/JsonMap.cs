@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Pila.CredentialSdk.DidComm.Credential.Common.Crypto;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.Signer;
 using Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 
 namespace Pila.CredentialSdk.DidComm.Credential.Common.JsonMap;
@@ -72,7 +73,7 @@ public class JsonMap : Dictionary<string, object>
         var encoded = JsonSerializer.SerializeToUtf8Bytes(mCopy);
         
         // Deserialize to ensure proper format
-        var doc = JsonSerializer.Deserialize<Dictionary<string, object>>(encoded);
+        var doc = JsonSerializer.Deserialize<Dictionary<string, object?>>(encoded);
         if (doc == null)
         {
             throw new InvalidOperationException("Failed to unmarshal JSONMap copy");
@@ -88,8 +89,46 @@ public class JsonMap : Dictionary<string, object>
     /// <summary>
     /// Adds an ECDSA proof to the JSONMap.
     /// </summary>
+    [Obsolete("Use AddECDSAProofByProvider(ISignerProvider, ...) instead.")]
     public void AddECDSAProof(string privateKeyHex, string verificationMethod, string proofPurpose, string didBaseUrl)
     {
+        // Keep legacy behavior: validate the private key matches the verification method.
+        var resolver = new VerificationMethodResolver(didBaseUrl);
+        // Legacy sync wrapper blocks on async I/O. Prefer AddECDSAProofByProvider with external key validation.
+        var isValid = resolver.CheckVerificationMethodAsync(privateKeyHex, verificationMethod)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .GetResult();
+        if (!isValid)
+        {
+            throw new InvalidOperationException("private key and verification method do not match");
+        }
+
+        AddECDSAProofByProvider(new DefaultSignerProvider(privateKeyHex), verificationMethod, proofPurpose);
+    }
+
+    /// <summary>
+    /// Adds an ECDSA proof to the JSONMap using a signer provider.
+    /// </summary>
+    /// <remarks>
+    /// Contract:
+    /// <list type="bullet">
+    /// <item>The SDK computes a 32-byte digest (canonicalized document without proof, then SHA-256).</item>
+    /// <item>The digest (32 bytes) is passed to <paramref name="signerProvider"/>.</item>
+    /// <item>The provider may return 64 bytes (R||S) or 65 bytes (R||S||V). Both are accepted.</item>
+    /// <item>The signature bytes are stored as hex in <c>proof.proofValue</c> without normalization.</item>
+    /// </list>
+    ///
+    /// This method does not validate that <paramref name="verificationMethod"/> matches the signer's key.
+    /// If you need key↔verificationMethod validation, do it externally or use the legacy
+    /// <see cref="AddECDSAProof(string,string,string,string)"/> wrapper (deprecated).
+    /// </remarks>
+    public void AddECDSAProofByProvider(ISignerProvider signerProvider, string verificationMethod, string proofPurpose)
+    {
+        if (signerProvider == null)
+        {
+            throw new ArgumentNullException(nameof(signerProvider));
+        }
         if (string.IsNullOrEmpty(verificationMethod))
         {
             throw new ArgumentException("verification method is required");
@@ -97,14 +136,6 @@ public class JsonMap : Dictionary<string, object>
         if (string.IsNullOrEmpty(proofPurpose))
         {
             throw new ArgumentException("proof purpose is required");
-        }
-
-        // Verify private key matches verification method
-        var resolver = new VerificationMethodResolver(didBaseUrl);
-        var isValid = resolver.CheckVerificationMethodAsync(privateKeyHex, verificationMethod).GetAwaiter().GetResult();
-        if (!isValid)
-        {
-            throw new InvalidOperationException("private key and verification method do not match");
         }
 
         var proof = new Proof
@@ -117,9 +148,12 @@ public class JsonMap : Dictionary<string, object>
         };
 
         var signData = Canonicalize();
-        var signature = EcdsaSigner.Sign(signData, privateKeyHex);
-        proof.ProofValue = Convert.ToHexString(signature).ToLowerInvariant();
+        SignerProviderUtil.EnsureDigest32(signData);
 
+        var signature = signerProvider.Sign(signData);
+        SignerProviderUtil.EnsureSignatureLength(signature);
+
+        proof.ProofValue = Convert.ToHexString(signature).ToLowerInvariant();
         this["proof"] = SerializeProof(proof);
     }
 
@@ -131,6 +165,38 @@ public class JsonMap : Dictionary<string, object>
         if (proof == null)
         {
             throw new ArgumentNullException(nameof(proof));
+        }
+
+        // Validate custom signatures (when provided) follow the SDK signature contract (64/65 bytes).
+        if (!string.IsNullOrEmpty(proof.ProofValue))
+        {
+            var hex = proof.ProofValue.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? proof.ProofValue.Substring(2)
+                : proof.ProofValue;
+
+            byte[] sig;
+            try
+            {
+                sig = Convert.FromHexString(hex);
+            }
+            catch (Exception ex)
+            {
+                throw new ArgumentException("Invalid proofValue hex string", nameof(proof), ex);
+            }
+
+            SignerProviderUtil.EnsureSignatureLength(sig);
+        }
+
+        if (!string.IsNullOrEmpty(proof.Jws))
+        {
+            var parts = proof.Jws.Split('.');
+            if (parts.Length != 3)
+            {
+                throw new ArgumentException("Invalid jws format: expected 3 parts", nameof(proof));
+            }
+
+            var sig = Base64UrlDecode(parts[2]);
+            SignerProviderUtil.EnsureSignatureLength(sig);
         }
 
         this["proof"] = SerializeProof(proof);
@@ -186,7 +252,10 @@ public class JsonMap : Dictionary<string, object>
 
             var issuerDID = issuerObj.ToString()!;
             var resolver = new VerificationMethodResolver(didBaseUrl);
-            var publicKey = resolver.GetDefaultPublicKeyAsync(issuerDID).GetAwaiter().GetResult();
+            var publicKey = resolver.GetDefaultPublicKeyAsync(issuerDID)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
 
             // TODO: Implement VerifyJwtProof
             throw new NotImplementedException("JwtProof2020 verification not yet implemented");
@@ -198,7 +267,10 @@ public class JsonMap : Dictionary<string, object>
         else if (proof.Type == DataIntegrityProof && proof.Cryptosuite == ECDSARDFC2019)
         {
             var resolver = new VerificationMethodResolver(didBaseUrl);
-            var publicKey = resolver.GetPublicKeyAsync(proof.VerificationMethod).GetAwaiter().GetResult();
+            var publicKey = resolver.GetPublicKeyAsync(proof.VerificationMethod)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
             return VerifyECDSA(publicKey, proof);
         }
         else
@@ -292,7 +364,10 @@ public class JsonMap : Dictionary<string, object>
 
         // Resolve public key from verification method
         var resolver = new VerificationMethodResolver(didBaseUrl);
-        var publicKeyHex = resolver.GetPublicKeyAsync(verificationMethod).GetAwaiter().GetResult();
+        var publicKeyHex = resolver.GetPublicKeyAsync(verificationMethod)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .GetResult();
 
         // Remove 0x prefix if present (preserves leading zeros)
         publicKeyHex = Pila.CredentialSdk.DidComm.Credential.Common.Util.Util.RemoveHexPrefix(publicKeyHex);
@@ -319,7 +394,10 @@ public class JsonMap : Dictionary<string, object>
 
         // Resolve public key from verification method
         var resolver = new VerificationMethodResolver(didBaseUrl);
-        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(proof.VerificationMethod).GetAwaiter().GetResult();
+        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(proof.VerificationMethod)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .GetResult();
 
         // Remove 0x prefix if present (preserves leading zeros)
         publicKeyHex = Pila.CredentialSdk.DidComm.Credential.Common.Util.Util.RemoveHexPrefix(publicKeyHex);
@@ -468,4 +546,3 @@ public class JsonMap : Dictionary<string, object>
         return Convert.FromBase64String(base64);
     }
 }
-

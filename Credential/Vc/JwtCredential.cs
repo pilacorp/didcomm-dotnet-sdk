@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Pila.CredentialSdk.DidComm.Credential.Common.Crypto;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.Signer;
 using Pila.CredentialSdk.DidComm.Credential.Common.Util;
 using Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 using Pila.CredentialSdk.DidComm.Credential.Vc;
@@ -172,16 +173,54 @@ public class JwtCredential : ICredential
     /// <summary>
     /// Adds a proof (signature) to the JWT credential.
     /// </summary>
+    [Obsolete("Use AddProofByProvider(ISignerProvider, ...) instead.")]
     public void AddProof(string privateKeyHex, params CredentialOpt[] opts)
     {
-        // Hash the signing input
+        AddProofByProvider(new DefaultSignerProvider(privateKeyHex), opts);
+    }
+
+    /// <summary>
+    /// Adds a proof (signature) to the JWT credential using a signer provider.
+    /// </summary>
+    /// <remarks>
+    /// Contract:
+    /// <list type="bullet">
+    /// <item>The SDK computes a 32-byte SHA-256 digest of the JWT signing input (header.payload).</item>
+    /// <item>The digest is passed to <paramref name="signerProvider"/>.</item>
+    /// <item>The provider may return 64 bytes (R||S) or 65 bytes (R||S||V).</item>
+    /// <item>JWT requires 64-byte signatures, so the SDK normalizes 65 bytes down to 64 by dropping V.</item>
+    /// </list>
+    /// </remarks>
+    public void AddProofByProvider(ISignerProvider signerProvider, params CredentialOpt[] opts)
+    {
+        var options = Credential.GetOptions(opts);
+
+        if (signerProvider == null)
+        {
+            throw new ArgumentNullException(nameof(signerProvider));
+        }
+
+        // Hash the signing input (always 32-byte digest)
         var hashMessage = Canonicalizer.ComputeDigest(Encoding.UTF8.GetBytes(_signingInput));
+        SignerProviderUtil.EnsureDigest32(hashMessage);
 
-        // Sign the existing signing input
-        var signature = EcdsaSigner.Sign(hashMessage, privateKeyHex);
+        var signature = signerProvider.Sign(hashMessage);
+        var jwtSig64 = SignerProviderUtil.NormalizeTo64(signature);
 
-        // Update signature
-        _signature = Util.Base64UrlEncode(signature);
+        var previousSignature = _signature;
+        _signature = Util.Base64UrlEncode(jwtSig64);
+
+        try
+        {
+            // Verify immediately to ensure the produced signature can be resolved and verified.
+            VerifyProof(options.DidBaseUrl);
+        }
+        catch
+        {
+            // Roll back on failure; do not leave the credential in a partially signed state.
+            _signature = previousSignature;
+            throw;
+        }
     }
 
     /// <summary>
@@ -207,8 +246,10 @@ public class JwtCredential : ICredential
             throw new ArgumentException("Proof signature cannot be empty");
         }
 
-        // Use the provided signature directly (base64url encoded)
-        _signature = Util.Base64UrlEncode(proof.Signature);
+        // Accept 64 or 65 bytes (R||S or R||S||V). JWT requires 64-byte signature, so normalize.
+        SignerProviderUtil.EnsureSignatureLength(proof.Signature);
+        var jwtSig64 = SignerProviderUtil.NormalizeTo64(proof.Signature);
+        _signature = Util.Base64UrlEncode(jwtSig64);
     }
 
     /// <summary>
@@ -326,7 +367,10 @@ public class JwtCredential : ICredential
 
         // Resolve public key from DID
         var resolver = new VerificationMethodResolver(didBaseUrl);
-        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(did).GetAwaiter().GetResult();
+        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(did)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .GetResult();
 
         // Decode signature from base64url to bytes
         var signatureBytes = Util.Base64UrlDecode(_signature);
@@ -346,4 +390,3 @@ public class JwtCredential : ICredential
         }
     }
 }
-

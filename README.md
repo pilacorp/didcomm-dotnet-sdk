@@ -159,14 +159,15 @@ var contents = new CredentialContents
 };
 
 const string privKeyHex = "e5c9a597b20e13627a3850d38439b61ec9ee7aefd77c7cb6c01dc3866e1db19a";
+var signerProvider = new Pila.CredentialSdk.DidComm.Credential.Common.Signer.DefaultSignerProvider(privKeyHex);
 
 var createdJsonVc = JsonCredential.NewJsonCredential(contents);
-createdJsonVc.AddProof(privKeyHex);
+createdJsonVc.AddProofByProvider(signerProvider);
 createdJsonVc.Verify();
 
 // Create JWT VC and add proof
 var createdJwtVc = JwtCredential.NewJwtCredential(contents);
-createdJwtVc.AddProof(privKeyHex);
+createdJwtVc.AddProofByProvider(signerProvider);
 createdJwtVc.Verify();
 ```
 

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.Signer;
 using Pila.CredentialSdk.DidComm.Credential.Vc;
 using JsonMapType = Pila.CredentialSdk.DidComm.Credential.Common.JsonMap.JsonMap;
 
@@ -75,6 +76,7 @@ public class JsonCredential : ICredential
     /// <summary>
     /// Adds an ECDSA proof to the credential.
     /// </summary>
+    [Obsolete("Use AddProofByProvider(ISignerProvider, ...) instead.")]
     public void AddProof(string privateKeyHex, params CredentialOpt[] opts)
     {
         var options = Credential.GetOptions(opts);
@@ -87,8 +89,60 @@ public class JsonCredential : ICredential
         var issuer = issuerObj.ToString()!;
         var verificationMethod = $"{issuer}#{_verificationMethod}";
 
-        // Use JsonMap to add proof
+        // Legacy behavior: validate private key matches verification method via resolver.
         _jsonMap.AddECDSAProof(privateKeyHex, verificationMethod, "assertionMethod", options.DidBaseUrl);
+    }
+
+    /// <summary>
+    /// Adds an ECDSA proof to the credential using a signer provider.
+    /// </summary>
+    /// <remarks>
+    /// The SDK computes a 32-byte digest (canonicalized document without proof, then SHA-256) and asks the
+    /// <paramref name="signerProvider"/> to sign it. The provider may return 64 bytes (R||S) or 65 bytes
+    /// (R||S||V); both are accepted and stored as hex in <c>proof.proofValue</c>.
+    /// </remarks>
+    public void AddProofByProvider(ISignerProvider signerProvider, params CredentialOpt[] opts)
+    {
+        var options = Credential.GetOptions(opts);
+
+        if (signerProvider == null)
+        {
+            throw new ArgumentNullException(nameof(signerProvider));
+        }
+
+        if (!_jsonMap.TryGetValue("issuer", out var issuerObj) || issuerObj == null)
+        {
+            throw new InvalidOperationException("Issuer is required to add proof");
+        }
+
+        var issuer = issuerObj.ToString()!;
+        var verificationMethod = $"{issuer}#{_verificationMethod}";
+
+        var hadExistingProof = _jsonMap.TryGetValue("proof", out var previousProof);
+
+        _jsonMap.AddECDSAProofByProvider(signerProvider, verificationMethod, "assertionMethod");
+
+        try
+        {
+            var isValid = _jsonMap.VerifyProof(options.DidBaseUrl);
+            if (!isValid)
+            {
+                throw new InvalidOperationException("Proof verification failed");
+            }
+        }
+        catch
+        {
+            // Roll back on failure; restore previous proof state (if any).
+            if (hadExistingProof)
+            {
+                _jsonMap["proof"] = previousProof!;
+            }
+            else
+            {
+                _jsonMap.Remove("proof");
+            }
+            throw;
+        }
     }
 
     /// <summary>
@@ -186,4 +240,3 @@ public class JsonCredential : ICredential
         }
     }
 }
-

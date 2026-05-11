@@ -10,7 +10,7 @@ namespace Pila.CredentialSdk.DidComm.Tests.Credential.Vc;
 public class CredentialTests
 {
     private const string ValidJsonCredential = @"{
-        ""@context"": [""https://www.w3.org/2018/credentials/v1""],
+        ""@context"": [""https://www.w3.org/ns/credentials/v2""],
         ""id"": ""urn:uuid:1234"",
         ""type"": [""VerifiableCredential""],
         ""issuer"": ""did:example:issuer"",
@@ -29,7 +29,7 @@ public class CredentialTests
     {
         var contents = new CredentialContents
         {
-            Context = new List<object> { "https://www.w3.org/2018/credentials/v1" },
+            Context = new List<object> { "https://www.w3.org/ns/credentials/v2" },
             Id = "urn:uuid:1234",
             Issuer = "did:example:issuer",
             Types = new List<string> { "VerifiableCredential" },
@@ -74,4 +74,3 @@ public class CredentialTests
         Assert.Throws<ArgumentException>(() => CredentialStatic.ParseCredential(Array.Empty<byte>()));
     }
 }
-
