@@ -107,31 +107,7 @@ public class JsonCredential : ICredential
         var issuer = issuerObj.ToString()!;
         var verificationMethod = $"{issuer}#{_verificationMethod}";
 
-        var hadExistingProof = _jsonMap.TryGetValue("proof", out var previousProof);
-
         _jsonMap.AddECDSAProofByProvider(signerProvider, verificationMethod, "assertionMethod");
-
-        try
-        {
-            var isValid = _jsonMap.VerifyProof(options.DidBaseUrl);
-            if (!isValid)
-            {
-                throw new InvalidOperationException("Proof verification failed");
-            }
-        }
-        catch
-        {
-            // Roll back on failure; restore previous proof state (if any).
-            if (hadExistingProof)
-            {
-                _jsonMap["proof"] = previousProof!;
-            }
-            else
-            {
-                _jsonMap.Remove("proof");
-            }
-            throw;
-        }
     }
 
     /// <summary>

@@ -220,10 +220,7 @@ public class JsonMap : Dictionary<string, object>
 
             var issuerDID = issuerObj.ToString()!;
             var resolver = new VerificationMethodResolver(didBaseUrl);
-            var publicKey = resolver.GetDefaultPublicKeyAsync(issuerDID)
-                .ConfigureAwait(false)
-                .GetAwaiter()
-                .GetResult();
+            var publicKey = resolver.GetDefaultPublicKeyAsync(issuerDID).GetAwaiter().GetResult();
 
             // TODO: Implement VerifyJwtProof
             throw new NotImplementedException("JwtProof2020 verification not yet implemented");
@@ -235,10 +232,7 @@ public class JsonMap : Dictionary<string, object>
         else if (proof.Type == DataIntegrityProof && proof.Cryptosuite == ECDSARDFC2019)
         {
             var resolver = new VerificationMethodResolver(didBaseUrl);
-            var publicKey = resolver.GetPublicKeyAsync(proof.VerificationMethod)
-                .ConfigureAwait(false)
-                .GetAwaiter()
-                .GetResult();
+            var publicKey = resolver.GetPublicKeyAsync(proof.VerificationMethod).GetAwaiter().GetResult();
             return VerifyECDSA(publicKey, proof);
         }
         else
@@ -332,10 +326,7 @@ public class JsonMap : Dictionary<string, object>
 
         // Resolve public key from verification method
         var resolver = new VerificationMethodResolver(didBaseUrl);
-        var publicKeyHex = resolver.GetPublicKeyAsync(verificationMethod)
-            .ConfigureAwait(false)
-            .GetAwaiter()
-            .GetResult();
+        var publicKeyHex = resolver.GetPublicKeyAsync(verificationMethod).GetAwaiter().GetResult();
 
         // Remove 0x prefix if present (preserves leading zeros)
         publicKeyHex = Pila.CredentialSdk.DidComm.Credential.Common.Util.Util.RemoveHexPrefix(publicKeyHex);
@@ -362,10 +353,7 @@ public class JsonMap : Dictionary<string, object>
 
         // Resolve public key from verification method
         var resolver = new VerificationMethodResolver(didBaseUrl);
-        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(proof.VerificationMethod)
-            .ConfigureAwait(false)
-            .GetAwaiter()
-            .GetResult();
+        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(proof.VerificationMethod).GetAwaiter().GetResult();
 
         // Remove 0x prefix if present (preserves leading zeros)
         publicKeyHex = Pila.CredentialSdk.DidComm.Credential.Common.Util.Util.RemoveHexPrefix(publicKeyHex);

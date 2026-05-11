@@ -193,8 +193,6 @@ public class JwtCredential : ICredential
     /// </remarks>
     public void AddProofByProvider(ISignerProvider signerProvider, params CredentialOpt[] opts)
     {
-        var options = Credential.GetOptions(opts);
-
         if (signerProvider == null)
         {
             throw new ArgumentNullException(nameof(signerProvider));
@@ -207,20 +205,7 @@ public class JwtCredential : ICredential
         var signature = signerProvider.Sign(hashMessage);
         var jwtSig64 = SignerProviderUtil.NormalizeTo64(signature);
 
-        var previousSignature = _signature;
         _signature = Util.Base64UrlEncode(jwtSig64);
-
-        try
-        {
-            // Verify immediately to ensure the produced signature can be resolved and verified.
-            VerifyProof(options.DidBaseUrl);
-        }
-        catch
-        {
-            // Roll back on failure; do not leave the credential in a partially signed state.
-            _signature = previousSignature;
-            throw;
-        }
     }
 
     /// <summary>
@@ -365,10 +350,7 @@ public class JwtCredential : ICredential
 
         // Resolve public key from DID
         var resolver = new VerificationMethodResolver(didBaseUrl);
-        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(did)
-            .ConfigureAwait(false)
-            .GetAwaiter()
-            .GetResult();
+        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(did).GetAwaiter().GetResult();
 
         // Decode signature from base64url to bytes
         var signatureBytes = Util.Base64UrlDecode(_signature);
