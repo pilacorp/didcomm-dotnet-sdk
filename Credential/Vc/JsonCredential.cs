@@ -79,7 +79,18 @@ public class JsonCredential : ICredential
     [Obsolete("Use AddProofByProvider(ISignerProvider, ...) instead.")]
     public void AddProof(string privateKeyHex, params CredentialOpt[] opts)
     {
-        AddProofByProvider(new DefaultSignerProvider(privateKeyHex), opts);
+        var options = Credential.GetOptions(opts);
+
+        if (!_jsonMap.TryGetValue("issuer", out var issuerObj) || issuerObj == null)
+        {
+            throw new InvalidOperationException("Issuer is required to add proof");
+        }
+
+        var issuer = issuerObj.ToString()!;
+        var verificationMethod = $"{issuer}#{_verificationMethod}";
+
+        // Legacy behavior: validate private key matches verification method via resolver.
+        _jsonMap.AddECDSAProof(privateKeyHex, verificationMethod, "assertionMethod", options.DidBaseUrl);
     }
 
     /// <summary>

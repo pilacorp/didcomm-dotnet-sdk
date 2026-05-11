@@ -150,4 +150,28 @@ public class SignerProviderTests
         var decodedSig = Util.Base64UrlDecode(parts[2]);
         Assert.Equal(64, decodedSig.Length);
     }
+
+    [Fact]
+    public void JsonCredential_AddProof_LegacyValidatesVerificationMethod()
+    {
+        const string did = "did:example:issuer";
+        var publicKeyHex = DeriveCompressedPublicKey(PrivateKeyHex);
+        using var resolver = new LocalDidResolver(did, publicKeyHex);
+
+        var contents = new CredentialContents
+        {
+            Context = new List<object> { "https://www.w3.org/ns/credentials/v2" },
+            Id = "urn:uuid:json-legacy-test",
+            Issuer = did,
+            Types = new List<string> { "VerifiableCredential" },
+            Subject = new List<Subject> { new() { Id = "did:example:subject1" } }
+        };
+
+        var credential = JsonCredential.NewJsonCredential(contents, CredentialOpts.WithVerificationMethodKey("key-1"));
+
+        // Should not throw when DID resolver returns a public key matching the provided private key.
+#pragma warning disable CS0618 // Legacy API intentionally covered.
+        credential.AddProof(PrivateKeyHex, CredentialOpts.WithBaseUrl(resolver.BaseUrl));
+#pragma warning restore CS0618
+    }
 }
