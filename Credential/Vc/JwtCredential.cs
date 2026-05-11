@@ -246,8 +246,10 @@ public class JwtCredential : ICredential
             throw new ArgumentException("Proof signature cannot be empty");
         }
 
-        // Use the provided signature directly (base64url encoded)
-        _signature = Util.Base64UrlEncode(proof.Signature);
+        // Accept 64 or 65 bytes (R||S or R||S||V). JWT requires 64-byte signature, so normalize.
+        SignerProviderUtil.EnsureSignatureLength(proof.Signature);
+        var jwtSig64 = SignerProviderUtil.NormalizeTo64(proof.Signature);
+        _signature = Util.Base64UrlEncode(jwtSig64);
     }
 
     /// <summary>

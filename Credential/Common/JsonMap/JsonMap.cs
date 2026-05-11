@@ -167,6 +167,38 @@ public class JsonMap : Dictionary<string, object>
             throw new ArgumentNullException(nameof(proof));
         }
 
+        // Validate custom signatures (when provided) follow the SDK signature contract (64/65 bytes).
+        if (!string.IsNullOrEmpty(proof.ProofValue))
+        {
+            var hex = proof.ProofValue.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? proof.ProofValue.Substring(2)
+                : proof.ProofValue;
+
+            byte[] sig;
+            try
+            {
+                sig = Convert.FromHexString(hex);
+            }
+            catch (Exception ex)
+            {
+                throw new ArgumentException("Invalid proofValue hex string", nameof(proof), ex);
+            }
+
+            SignerProviderUtil.EnsureSignatureLength(sig);
+        }
+
+        if (!string.IsNullOrEmpty(proof.Jws))
+        {
+            var parts = proof.Jws.Split('.');
+            if (parts.Length != 3)
+            {
+                throw new ArgumentException("Invalid jws format: expected 3 parts", nameof(proof));
+            }
+
+            var sig = Base64UrlDecode(parts[2]);
+            SignerProviderUtil.EnsureSignatureLength(sig);
+        }
+
         this["proof"] = SerializeProof(proof);
     }
 
