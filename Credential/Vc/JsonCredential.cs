@@ -96,7 +96,12 @@ public class JsonCredential : ICredential
     /// </summary>
     public byte[] GetSigningInput()
     {
-        return _jsonMap.Canonicalize();
+        return _jsonMap.GetDocumentDigest();
+    }
+
+    public byte[] CreateProofSigning(byte[] docHash, Proof proof)
+    {
+        return _jsonMap.CreateProofSigning(docHash, proof);
     }
 
     /// <summary>

@@ -539,3 +539,6 @@ FodyWeavers.xsd
 .idea/
 *.sln.iml
 obj/project.nuget.cache
+
+# Ignore all files in the build directory
+.dotnet-cli/

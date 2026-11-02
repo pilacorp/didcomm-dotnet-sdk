@@ -1,6 +1,9 @@
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Org.BouncyCastle.Asn1.Sec;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Math;
 using Pila.CredentialSdk.DidComm.Credential.Common.Crypto;
 
 namespace Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
@@ -62,6 +65,66 @@ public class VerificationMethodResolver
         }
 
         throw new InvalidOperationException($"Verification method '{verificationMethodUrl}' not found in DID document");
+    }
+
+    public Task<VerificationMethodEntry> FindVerificationMethodAsync(string verificationMethodUrl)
+    {
+        var parts = verificationMethodUrl.Split('#');
+        if (parts.Length == 0 || string.IsNullOrEmpty(parts[0]))
+        {
+            throw new ArgumentException($"Invalid verification method URL: {verificationMethodUrl}");
+        }
+        return FindInDocAsync(parts[0], verificationMethodUrl);
+    }
+
+    public Task<DidDocument> ResolveDocumentAsync(string did) => ResolveToDocAsync(did);
+
+    public async Task<ECPublicKeyParameters> EcPublicKeyFromEntryAsync(VerificationMethodEntry vm)
+    {
+        if (vm.PublicKeyJwk != null)
+        {
+            return JwkToPublicKey(vm.PublicKeyJwk);
+        }
+        if (!string.IsNullOrEmpty(vm.PublicKeyHex))
+        {
+            var hex = Util.Util.RemoveHexPrefix(vm.PublicKeyHex);
+            return EcdsaRawVerifier.PublicKeyFromHex(hex, "secp256k1");
+        }
+        throw new InvalidOperationException($"No public key in verification method {vm.Id}");
+    }
+
+    private async Task<VerificationMethodEntry> FindInDocAsync(string did, string verificationMethodUrl)
+    {
+        var doc = await ResolveToDocAsync(did);
+        foreach (var vm in doc.VerificationMethod)
+        {
+            if (vm.Id == verificationMethodUrl)
+            {
+                return vm;
+            }
+        }
+        throw new InvalidOperationException($"Verification method '{verificationMethodUrl}' not found in DID document");
+    }
+
+    private ECPublicKeyParameters JwkToPublicKey(Jwk jwk)
+    {
+        if (jwk.Kty != "EC")
+        {
+            throw new NotSupportedException($"Unsupported key type: {jwk.Kty}");
+        }
+        var curveName = jwk.Crv switch
+        {
+            "secp256k1" => "secp256k1",
+            "P-256" => "P-256",
+            _ => throw new NotSupportedException($"Unsupported curve: {jwk.Crv}")
+        };
+        var xBytes = Base64UrlDecode(jwk.X);
+        var yBytes = Base64UrlDecode(jwk.Y);
+        var curve = SecNamedCurves.GetByName(curveName)
+            ?? SecNamedCurves.GetByName("prime256v1");
+        var domain = new ECDomainParameters(curve!.Curve, curve.G, curve.N, curve.H);
+        var point = curve.Curve.CreatePoint(new BigInteger(1, xBytes), new BigInteger(1, yBytes));
+        return new ECPublicKeyParameters("EC", point, domain);
     }
 
     /// <summary>
@@ -222,6 +285,12 @@ public class VerificationMethodEntry
 
     [JsonPropertyName("publicKeyJwk")]
     public Jwk? PublicKeyJwk { get; set; }
+
+    [JsonPropertyName("revoked")]
+    public string? Revoked { get; set; }
+
+    [JsonPropertyName("revocationReason")]
+    public string? RevocationReason { get; set; }
 }
 
 /// <summary>

@@ -192,6 +192,11 @@ public class JwtCredential : ICredential
         return Encoding.UTF8.GetBytes(_signingInput);
     }
 
+    public byte[] CreateProofSigning(byte[] docHash, Proof proof)
+    {
+        throw new NotSupportedException("createProofSigning applies to JSON-LD credentials only");
+    }
+
     /// <summary>
     /// Adds a custom proof to the JWT credential.
     /// </summary>

@@ -155,6 +155,8 @@ public interface ICredential
     /// </summary>
     byte[] GetSigningInput();
 
+    byte[] CreateProofSigning(byte[] docHash, Proof proof);
+
     /// <summary>
     /// Adds a custom proof to the credential.
     /// </summary>

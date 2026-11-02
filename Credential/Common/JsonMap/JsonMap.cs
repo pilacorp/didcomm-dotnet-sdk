@@ -1,13 +1,17 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Org.BouncyCastle.Asn1.Sec;
+using Org.BouncyCastle.Math;
 using Pila.CredentialSdk.DidComm.Credential.Common.Crypto;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.Util;
 using Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 
 namespace Pila.CredentialSdk.DidComm.Credential.Common.JsonMap;
 
 /// <summary>
-/// Represents a JSON object as a map.
+/// JSON-LD map with Go go-credential-sdk jsonmap parity for signing and verification.
 /// </summary>
 public class JsonMap : Dictionary<string, object>
 {
@@ -17,96 +21,21 @@ public class JsonMap : Dictionary<string, object>
     public const string ECDSARDFC2019 = "ecdsa-rdfc-2019";
     public const string ECDSASECPKEY = "EcdsaSecp256k1VerificationKey2019";
 
-    /// <summary>
-    /// Serializes the JSONMap to JSON bytes.
-    /// </summary>
     public byte[] ToJSON()
     {
-        var data = JsonSerializer.Serialize(this, new JsonSerializerOptions
-        {
-            WriteIndented = false
-        });
-
-        // Validate serialization by deserializing
-        var temp = JsonSerializer.Deserialize<JsonMap>(data);
-        if (temp == null)
-        {
-            throw new InvalidOperationException("Failed to validate serialization");
-        }
-
+        var data = JsonSerializer.Serialize(this);
         return Encoding.UTF8.GetBytes(data);
     }
 
-    /// <summary>
-    /// Converts the JSONMap to a regular dictionary.
-    /// </summary>
     public Dictionary<string, object> ToMap()
     {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(this);
-        var data = JsonSerializer.Deserialize<Dictionary<string, object>>(bytes);
-        
-        if (data == null)
-        {
-            throw new InvalidOperationException("Failed to unmarshal JSONMap");
-        }
-
-        return data;
+        var json = JsonSerializer.Serialize(this);
+        return JsonSerializer.Deserialize<Dictionary<string, object>>(json)
+            ?? throw new InvalidOperationException("Failed to unmarshal JSONMap");
     }
 
-    /// <summary>
-    /// Canonicalizes the JSONMap for signing or verification, excluding the proof field.
-    /// </summary>
-    public byte[] Canonicalize()
-    {
-        // Create a copy without the proof field
-        var mCopy = new JsonMap();
-        foreach (var kvp in this)
-        {
-            if (kvp.Key != "proof")
-            {
-                mCopy[kvp.Key] = kvp.Value;
-            }
-        }
-
-        // Serialize to JSON
-        var encoded = JsonSerializer.SerializeToUtf8Bytes(mCopy);
-        
-        // Deserialize to ensure proper format
-        var doc = JsonSerializer.Deserialize<Dictionary<string, object>>(encoded);
-        if (doc == null)
-        {
-            throw new InvalidOperationException("Failed to unmarshal JSONMap copy");
-        }
-
-        // Canonicalize document (placeholder - will be filled with dotnetrdf)
-        var canonicalDoc = Canonicalizer.CanonicalizeWithoutProof(doc);
-
-        // Compute digest
-        return Canonicalizer.ComputeDigest(canonicalDoc);
-    }
-
-    /// <summary>
-    /// Adds an ECDSA proof to the JSONMap.
-    /// </summary>
     public void AddECDSAProof(string privateKeyHex, string verificationMethod, string proofPurpose, string didBaseUrl)
     {
-        if (string.IsNullOrEmpty(verificationMethod))
-        {
-            throw new ArgumentException("verification method is required");
-        }
-        if (string.IsNullOrEmpty(proofPurpose))
-        {
-            throw new ArgumentException("proof purpose is required");
-        }
-
-        // Verify private key matches verification method
-        var resolver = new VerificationMethodResolver(didBaseUrl);
-        var isValid = resolver.CheckVerificationMethodAsync(privateKeyHex, verificationMethod).GetAwaiter().GetResult();
-        if (!isValid)
-        {
-            throw new InvalidOperationException("private key and verification method do not match");
-        }
-
         var proof = new Proof
         {
             Type = DataIntegrityProof,
@@ -115,270 +44,280 @@ public class JsonMap : Dictionary<string, object>
             ProofPurpose = proofPurpose,
             Cryptosuite = ECDSARDFC2019
         };
-
-        var signData = Canonicalize();
-        var signature = EcdsaSigner.Sign(signData, privateKeyHex);
-        proof.ProofValue = Convert.ToHexString(signature).ToLowerInvariant();
-
-        this["proof"] = SerializeProof(proof);
+        var hashData = EcdsaHashData(proof);
+        var signDigest = SHA256.HashData(hashData);
+        var signature = EcdsaSigner.Sign(signDigest, privateKeyHex);
+        if (signature.Length == 65)
+        {
+            signature = signature[..64];
+        }
+        proof.ProofValue = Multibase.EncodeBase58Btc(signature);
+        AppendProof(proof);
     }
 
-    /// <summary>
-    /// Adds a custom proof to the JSONMap.
-    /// </summary>
+    public byte[] GetDocumentDigest() => DocumentDigest();
+
+    public byte[] CreateProofSigning(byte[] docHash, Proof proof) => ProofHashData(docHash, proof);
+
+    public byte[] DocumentDigest()
+    {
+        var body = BodyWithoutProof();
+        var canonical = Canonicalizer.CanonicalizeWithoutProof(body);
+        return Canonicalizer.ComputeDigest(canonical);
+    }
+
     public void AddCustomProof(Proof proof)
     {
         if (proof == null)
         {
             throw new ArgumentNullException(nameof(proof));
         }
-
-        this["proof"] = SerializeProof(proof);
+        AppendProof(proof);
     }
 
-    /// <summary>
-    /// Verifies an ECDSA-signed JSONMap.
-    /// </summary>
     public bool VerifyProof(string didBaseUrl)
     {
-        if (!TryGetValue("proof", out var proofObj) || proofObj == null)
+        var proofs = RawProofList();
+        if (proofs.Count == 0)
         {
             throw new InvalidOperationException("JSONMap has no proof");
         }
-
-        // Handle both single proof object and array of proofs
-        object? proofData = proofObj;
-        if (proofObj is JsonElement jsonElement)
+        foreach (var raw in proofs)
         {
-            if (jsonElement.ValueKind == JsonValueKind.Array)
+            var proof = ParseRawToProof(raw)!;
+            if (!VerifyOneProof(didBaseUrl, proof))
             {
-                if (jsonElement.GetArrayLength() > 0)
-                {
-                    proofData = jsonElement[0];
-                }
-                else
-                {
-                    throw new InvalidOperationException("Proof array is empty");
-                }
-            }
-            else
-            {
-                proofData = jsonElement;
+                return false;
             }
         }
-        else if (proofObj is List<object> proofList && proofList.Count > 0)
-        {
-            proofData = proofList[0];
-        }
-
-        var proof = ParseRawToProof(proofData);
-        if (proof == null)
-        {
-            throw new InvalidOperationException("Failed to parse proof");
-        }
-
-        if (proof.Type == JwtProof2020)
-        {
-            if (!TryGetValue("issuer", out var issuerObj) || issuerObj == null)
-            {
-                throw new InvalidOperationException("Issuer is missing or invalid in the request");
-            }
-
-            var issuerDID = issuerObj.ToString()!;
-            var resolver = new VerificationMethodResolver(didBaseUrl);
-            var publicKey = resolver.GetDefaultPublicKeyAsync(issuerDID).GetAwaiter().GetResult();
-
-            // TODO: Implement VerifyJwtProof
-            throw new NotImplementedException("JwtProof2020 verification not yet implemented");
-        }
-        else if (proof.Type == EcdsaSecp256k1Signature2019 || proof.Type == ECDSASECPKEY)
-        {
-            return VerifyEcdsaProofLegacy(didBaseUrl, proof);
-        }
-        else if (proof.Type == DataIntegrityProof && proof.Cryptosuite == ECDSARDFC2019)
-        {
-            var resolver = new VerificationMethodResolver(didBaseUrl);
-            var publicKey = resolver.GetPublicKeyAsync(proof.VerificationMethod).GetAwaiter().GetResult();
-            return VerifyECDSA(publicKey, proof);
-        }
-        else
-        {
-            throw new NotSupportedException($"Unsupported proof type: {proof.Type}");
-        }
+        return true;
     }
 
-    /// <summary>
-    /// Verifies an ECDSA-signed JSONMap.
-    /// </summary>
-    private bool VerifyECDSA(string publicKey, Proof proof)
+    private bool VerifyOneProof(string didBaseUrl, Proof proof)
     {
-        var doc = Canonicalize();
-        return EcdsaVerifier.VerifySignature(publicKey, proof.ProofValue!, doc);
+        var resolver = new VerificationMethodResolver(didBaseUrl);
+        if (proof.Type == EcdsaSecp256k1Signature2019 || proof.Type == ECDSASECPKEY)
+        {
+            return VerifyEcdsaSecp256k1Proof(resolver, proof);
+        }
+        if (proof.Type == DataIntegrityProof && proof.Cryptosuite == ECDSARDFC2019)
+        {
+            var vmEntry = resolver.FindVerificationMethodAsync(proof.VerificationMethod).GetAwaiter().GetResult();
+            var didPart = DidFromVerificationMethod(proof.VerificationMethod);
+            var doc = resolver.ResolveDocumentAsync(didPart).GetAwaiter().GetResult();
+            var pubKey = resolver.EcPublicKeyFromEntryAsync(vmEntry).GetAwaiter().GetResult();
+            if (!VerifyEcdsaRdfc(pubKey, proof))
+            {
+                return false;
+            }
+            StrictPurposeCheck.Enforce(doc, vmEntry, proof.ProofPurpose, proof.Created);
+            return true;
+        }
+        throw new NotSupportedException($"Unsupported proof type: {proof.Type}");
     }
 
-    /// <summary>
-    /// Verifies an ECDSA-signed JSONMap (legacy format).
-    /// Supports both proofValue (JSON-LD signature) and jws (JWT signature) formats.
-    /// </summary>
-    private bool VerifyEcdsaProofLegacy(string didBaseUrl, Proof proof)
+    private bool VerifyEcdsaRdfc(Org.BouncyCastle.Crypto.Parameters.ECPublicKeyParameters publicKey, Proof proof)
     {
-        if (!TryGetValue("proof", out var proofObj) || proofObj == null)
+        if (proof.ProofValue != null && proof.ProofValue.StartsWith('z'))
         {
-            throw new InvalidOperationException("Proof is missing or invalid in the request");
-        }
-
-        Dictionary<string, object>? proofMap = null;
-        if (proofObj is Dictionary<string, object> dict)
-        {
-            proofMap = dict;
-        }
-        else if (proofObj is JsonElement jsonElement)
-        {
-            var json = JsonSerializer.Serialize(jsonElement);
-            proofMap = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
-        }
-
-        if (proofMap == null)
-        {
-            throw new InvalidOperationException("Failed to parse proof map");
-        }
-
-        // Check if proof has jws field (JWT-based signature)
-        if (proofMap.TryGetValue("jws", out var jwsObj) && jwsObj != null)
-        {
-            var jws = jwsObj.ToString();
-            if (!string.IsNullOrEmpty(jws))
+            var signature = Multibase.DecodeBase58Btc(proof.ProofValue);
+            if (signature.Length != 64)
             {
-                return VerifyJWS(jws, didBaseUrl, proof);
+                return false;
             }
+            var hashData = EcdsaHashData(proof);
+            var digest = SHA256.HashData(hashData);
+            return EcdsaRawVerifier.Verify(publicKey, digest, signature);
         }
+        var legacyDoc = DocumentDigest();
+        var hexKey = publicKey.Q.GetEncoded(false);
+        return EcdsaVerifier.VerifySignature(
+            Convert.ToHexString(hexKey).ToLowerInvariant(),
+            proof.ProofValue!,
+            legacyDoc);
+    }
 
-        // Otherwise, check for proofValue (JSON-LD signature)
-        if (!proofMap.TryGetValue("proofValue", out var proofValueObj) || proofValueObj == null)
+    private bool VerifyEcdsaSecp256k1Proof(VerificationMethodResolver resolver, Proof proof)
+    {
+        if (string.IsNullOrEmpty(proof.Jws))
         {
-            throw new InvalidOperationException("Proof value is missing or invalid in the request");
+            throw new InvalidOperationException($"{EcdsaSecp256k1Signature2019}: malformed detached JWS");
         }
-
-        var proofValue = proofValueObj.ToString();
-        if (string.IsNullOrEmpty(proofValue))
+        var parts = JwsDetached.SplitDetachedJws(proof.Jws)
+            ?? throw new InvalidOperationException($"{EcdsaSecp256k1Signature2019}: malformed detached JWS");
+        var alg = JwsDetached.AlgFromEncodedHeader(parts[0]);
+        if (alg != JwsDetached.AlgEs256K)
         {
-            throw new InvalidOperationException("Proof value is missing or invalid in the request");
+            throw new InvalidOperationException($"{EcdsaSecp256k1Signature2019}: jws alg must be {JwsDetached.AlgEs256K}, got {alg}");
         }
-
-        if (!proofMap.TryGetValue("verificationMethod", out var vmObj) || vmObj == null)
+        var vmEntry = resolver.FindVerificationMethodAsync(proof.VerificationMethod).GetAwaiter().GetResult();
+        if (VerificationMethodKeyKindExtensions.FromEntry(vmEntry) != VerificationMethodKeyKind.Secp256k1)
         {
-            throw new InvalidOperationException("Proof verificationMethod is missing or invalid in the request");
+            throw new InvalidOperationException($"{EcdsaSecp256k1Signature2019}: verification method does not hold a secp256k1 key");
         }
-
-        var verificationMethod = vmObj.ToString();
-        if (string.IsNullOrEmpty(verificationMethod))
+        var didPart = DidFromVerificationMethod(proof.VerificationMethod);
+        var doc = resolver.ResolveDocumentAsync(didPart).GetAwaiter().GetResult();
+        var publicKey = resolver.EcPublicKeyFromEntryAsync(vmEntry).GetAwaiter().GetResult();
+        var hashData = EcdsaHashData(proof);
+        var signingInput = JwsDetached.SigningInput(parts[0], hashData);
+        var digest = SHA256.HashData(signingInput);
+        var signature = JwsDetached.DecodeCanonicalSignature(parts[1]);
+        if (signature.Length == 65)
         {
-            throw new InvalidOperationException("Proof verificationMethod is missing or invalid in the request");
+            signature = signature[..64];
         }
+        if (signature.Length != 64)
+        {
+            throw new InvalidOperationException($"{EcdsaSecp256k1Signature2019}: jws signature is {signature.Length} bytes, want 64");
+        }
+        var curve = SecNamedCurves.GetByName("secp256k1");
+        var halfN = curve.N.ShiftRight(1);
+        var s = new BigInteger(1, signature, 32, 32);
+        if (s.CompareTo(halfN) > 0)
+        {
+            throw new InvalidOperationException($"{EcdsaSecp256k1Signature2019}: jws signature is not low-S");
+        }
+        if (!EcdsaRawVerifier.Verify(publicKey, digest, signature))
+        {
+            return false;
+        }
+        StrictPurposeCheck.Enforce(doc, vmEntry, proof.ProofPurpose, proof.Created);
+        return true;
+    }
 
-        var signatureBytes = Convert.FromHexString(proofValue);
+    private static string DidFromVerificationMethod(string verificationMethodUrl)
+    {
+        var hashIndex = verificationMethodUrl.IndexOf('#');
+        if (hashIndex <= 0)
+        {
+            throw new InvalidOperationException($"verification method {verificationMethodUrl} is not a DID URL");
+        }
+        return verificationMethodUrl[..hashIndex];
+    }
 
-        // Create a copy without proof
-        var reqCopy = new Dictionary<string, object>();
+    private byte[] EcdsaHashData(Proof proof)
+    {
+        var docHash = DocumentDigest();
+        return ProofHashData(docHash, proof);
+    }
+
+    private byte[] ProofHashData(byte[] docHash, Proof proof)
+    {
+        if (docHash.Length != 32)
+        {
+            throw new ArgumentException("document digest must be 32 bytes");
+        }
+        var cfg = EcdsaProofConfig(proof);
+        var cfgCanonical = Canonicalizer.CanonicalizeWithoutProof(cfg);
+        var cfgHash = Canonicalizer.ComputeDigest(cfgCanonical);
+        var hashData = new byte[64];
+        Array.Copy(cfgHash, 0, hashData, 0, 32);
+        Array.Copy(docHash, 0, hashData, 32, 32);
+        return hashData;
+    }
+
+    private Dictionary<string, object> EcdsaProofConfig(Proof proof)
+    {
+        var json = JsonSerializer.Serialize(proof);
+        var cfg = JsonSerializer.Deserialize<Dictionary<string, object>>(json)
+            ?? throw new InvalidOperationException("failed to build proof configuration");
+        var sigField = proof.Type == EcdsaSecp256k1Signature2019 ? "jws" : "proofValue";
+        cfg.Remove(sigField);
+        cfg["@context"] = this.TryGetValue("@context", out var ctx) ? ctx : new object();
+        return cfg;
+    }
+
+    private Dictionary<string, object> BodyWithoutProof()
+    {
+        var body = new Dictionary<string, object>();
         foreach (var kvp in this)
         {
             if (kvp.Key != "proof")
             {
-                reqCopy[kvp.Key] = kvp.Value;
+                body[kvp.Key] = kvp.Value;
             }
         }
-
-        var message = JsonSerializer.SerializeToUtf8Bytes(reqCopy);
-
-        // Resolve public key from verification method
-        var resolver = new VerificationMethodResolver(didBaseUrl);
-        var publicKeyHex = resolver.GetPublicKeyAsync(verificationMethod).GetAwaiter().GetResult();
-
-        // Remove 0x prefix if present (preserves leading zeros)
-        publicKeyHex = Pila.CredentialSdk.DidComm.Credential.Common.Util.Util.RemoveHexPrefix(publicKeyHex);
-        var pubBytes = Convert.FromHexString(publicKeyHex);
-
-        // Verify JSON signature (this uses canonicalization)
-        // For legacy format, we need to use the raw JSON message
-        var signatureHex = Convert.ToHexString(signatureBytes).ToLowerInvariant();
-        return EcdsaVerifier.VerifySignature(Convert.ToHexString(pubBytes).ToLowerInvariant(), signatureHex, message);
+        return body;
     }
 
-    /// <summary>
-    /// Verifies a JWS (JSON Web Signature) token in EcdsaSecp256k1Signature2019 proof.
-    /// </summary>
-    private bool VerifyJWS(string jwsToken, string didBaseUrl, Proof proof)
+    private void AppendProof(Proof proof)
     {
-        if (string.IsNullOrEmpty(proof.VerificationMethod))
+        var merged = new List<Proof>();
+        foreach (var raw in RawProofList())
         {
-            throw new InvalidOperationException("VerificationMethod is required for JWS verification");
+            merged.Add(ParseRawToProof(raw)!);
         }
-
-        // Extract signature and message from JWS token
-        var (signature, message) = GetSignatureAndMessageFromJWS(jwsToken);
-
-        // Resolve public key from verification method
-        var resolver = new VerificationMethodResolver(didBaseUrl);
-        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(proof.VerificationMethod).GetAwaiter().GetResult();
-
-        // Remove 0x prefix if present (preserves leading zeros)
-        publicKeyHex = Pila.CredentialSdk.DidComm.Credential.Common.Util.Util.RemoveHexPrefix(publicKeyHex);
-        var pubBytes = Convert.FromHexString(publicKeyHex);
-        var signatureHex = Convert.ToHexString(signature).ToLowerInvariant();
-
-        // Verify signature (EcdsaVerifier will hash the message)
-        return EcdsaVerifier.VerifySignature(Convert.ToHexString(pubBytes).ToLowerInvariant(), signatureHex, message);
+        merged.Add(proof);
+        this["proof"] = SerializeProofs(merged);
     }
 
-    /// <summary>
-    /// Extracts signature and message from a JWS token.
-    /// </summary>
-    private static (byte[] signature, byte[] message) GetSignatureAndMessageFromJWS(string jwsToken)
+    private List<object> RawProofList()
     {
-        var parts = jwsToken.Split('.');
-        if (parts.Length != 3)
+        if (!TryGetValue("proof", out var proofObj) || proofObj == null)
         {
-            throw new ArgumentException($"Invalid JWS format: expected 3 parts, got {parts.Length}");
+            return new List<object>();
         }
-
-        var headerB64 = parts[0];
-        var payloadB64 = parts[1];
-        var signatureB64 = parts[2];
-
-        var signature = Base64UrlDecode(signatureB64);
-        var message = Encoding.UTF8.GetBytes($"{headerB64}.{payloadB64}");
-
-        return (signature, message);
+        if (proofObj is JsonElement el)
+        {
+            if (el.ValueKind == JsonValueKind.Array)
+            {
+                return el.EnumerateArray().Select(e => (object)e).ToList();
+            }
+            return new List<object> { el };
+        }
+        if (proofObj is List<object> list)
+        {
+            return list;
+        }
+        return new List<object> { proofObj };
     }
 
-    /// <summary>
-    /// Parses a raw proof object into a Proof DTO.
-    /// </summary>
+    private static object SerializeProofs(List<Proof> proofs)
+    {
+        var maps = proofs.Select(SerializeProof).ToList();
+        return maps.Count == 1 ? maps[0] : maps;
+    }
+
+    private static Dictionary<string, object> SerializeProof(Proof proof)
+    {
+        var d = new Dictionary<string, object>
+        {
+            ["type"] = proof.Type,
+            ["created"] = proof.Created,
+            ["verificationMethod"] = proof.VerificationMethod,
+            ["proofPurpose"] = proof.ProofPurpose
+        };
+        if (!string.IsNullOrEmpty(proof.ProofValue))
+        {
+            d["proofValue"] = proof.ProofValue;
+        }
+        if (!string.IsNullOrEmpty(proof.Jws))
+        {
+            d["jws"] = proof.Jws;
+        }
+        if (!string.IsNullOrEmpty(proof.Cryptosuite))
+        {
+            d["cryptosuite"] = proof.Cryptosuite;
+        }
+        return d;
+    }
+
     public static Proof? ParseRawToProof(object proof)
     {
         Dictionary<string, object>? proofMap = null;
-
         if (proof is Dictionary<string, object> dict)
         {
             proofMap = dict;
         }
         else if (proof is JsonElement jsonElement)
         {
-            var json = JsonSerializer.Serialize(jsonElement);
-            proofMap = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+            proofMap = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonElement.GetRawText());
         }
-        else
-        {
-            throw new ArgumentException($"Invalid proof format: expected Dictionary or JsonElement, got {proof.GetType()}");
-        }
-
         if (proofMap == null)
         {
             return null;
         }
-
         var result = new Proof();
-        
         if (proofMap.TryGetValue("type", out var type) && type != null)
         {
             result.Type = type.ToString() ?? "";
@@ -407,65 +346,9 @@ public class JsonMap : Dictionary<string, object>
         {
             result.Cryptosuite = cs.ToString();
         }
-
         return result;
     }
 
-    /// <summary>
-    /// Serializes a Proof to a dictionary.
-    /// </summary>
-    private static Dictionary<string, object> SerializeProof(Proof proof)
-    {
-        var proofDict = new Dictionary<string, object>
-        {
-            ["type"] = proof.Type,
-            ["created"] = proof.Created,
-            ["verificationMethod"] = proof.VerificationMethod,
-            ["proofPurpose"] = proof.ProofPurpose
-        };
-
-        if (!string.IsNullOrEmpty(proof.ProofValue))
-        {
-            proofDict["proofValue"] = proof.ProofValue;
-        }
-
-        if (!string.IsNullOrEmpty(proof.Jws))
-        {
-            proofDict["jws"] = proof.Jws;
-        }
-
-        if (!string.IsNullOrEmpty(proof.Cryptosuite))
-        {
-            proofDict["cryptosuite"] = proof.Cryptosuite;
-        }
-
-        if (proof.Disclosures != null && proof.Disclosures.Count > 0)
-        {
-            proofDict["disclosures"] = proof.Disclosures;
-        }
-
-        if (!string.IsNullOrEmpty(proof.Challenge))
-        {
-            proofDict["challenge"] = proof.Challenge;
-        }
-
-        if (!string.IsNullOrEmpty(proof.Domain))
-        {
-            proofDict["domain"] = proof.Domain;
-        }
-
-        return proofDict;
-    }
-
-    private static byte[] Base64UrlDecode(string input)
-    {
-        var base64 = input.Replace('-', '+').Replace('_', '/');
-        switch (base64.Length % 4)
-        {
-            case 2: base64 += "=="; break;
-            case 3: base64 += "="; break;
-        }
-        return Convert.FromBase64String(base64);
-    }
+    /// <summary>Canonical document digest (alias for DocumentDigest).</summary>
+    public byte[] Canonicalize() => DocumentDigest();
 }
-
