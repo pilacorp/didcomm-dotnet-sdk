@@ -1,4 +1,3 @@
-using System.Numerics;
 using Org.BouncyCastle.Asn1.Sec;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Crypto.Signers;
@@ -11,7 +10,7 @@ namespace Pila.CredentialSdk.DidComm.Credential.Common.Crypto;
 /// </summary>
 public static class EcdsaRawVerifier
 {
-    public static bool Verify(PublicKeyParameters publicKey, byte[] digest32, byte[] signature64)
+    public static bool Verify(ECPublicKeyParameters publicKey, byte[] digest32, byte[] signature64)
     {
         if (digest32.Length != 32 || signature64.Length != 64)
         {

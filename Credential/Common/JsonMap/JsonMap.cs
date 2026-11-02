@@ -46,10 +46,11 @@ public class JsonMap : Dictionary<string, object>
         };
         var hashData = EcdsaHashData(proof);
         var signDigest = SHA256.HashData(hashData);
-        var signature = EcdsaSigner.Sign(signDigest, privateKeyHex);
-        if (signature.Length == 65)
+        var signature = P256Signer.Sign(signDigest, privateKeyHex);
+        if (signature.Length != 64)
         {
-            signature = signature[..64];
+            throw new InvalidOperationException(
+                $"ecdsa-rdfc-2019 expects a 64-byte P-256 signature (r||s) but got {signature.Length}");
         }
         proof.ProofValue = Multibase.EncodeBase58Btc(signature);
         AppendProof(proof);

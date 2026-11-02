@@ -81,9 +81,27 @@ public static class VerificationMethodKeyKindExtensions
             {
                 return VerificationMethodKeyKind.Secp256k1;
             }
+            return VerificationMethodKeyKind.Unknown;
+        }
+        if (!string.IsNullOrEmpty(vm.PublicKeyMultibase))
+        {
+            try
+            {
+                return Multikey.KindFromMultibase(vm.PublicKeyMultibase);
+            }
+            catch
+            {
+                return VerificationMethodKeyKind.Unknown;
+            }
         }
         if (!string.IsNullOrEmpty(vm.PublicKeyHex))
         {
+            if (!string.IsNullOrEmpty(vm.Type)
+                && vm.Type != "EcdsaSecp256k1VerificationKey2019"
+                && vm.Type != "EcdsaSecp256k1Signature2019")
+            {
+                return VerificationMethodKeyKind.Unknown;
+            }
             return VerificationMethodKeyKind.Secp256k1;
         }
         return VerificationMethodKeyKind.Unknown;

@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Pila.CredentialSdk.DidComm.Credential.Common.JsonMap;
 using Pila.CredentialSdk.DidComm.Credential.Vc;
 using Xunit;
@@ -51,12 +54,65 @@ public class GoInteropFixturesTests : IDisposable
     }
 
     [Fact]
+    public void P256Multikey_ClassifiesFromPublicKeyMultibase()
+    {
+        var priv = "11".PadRight(64, '1')[..64];
+        var pub = Pila.CredentialSdk.DidComm.Credential.Common.Crypto.P256Signer.PublicFromPrivate(priv);
+        var mb = Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod.Multikey.EncodeP256(pub);
+        var vm = new Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod.VerificationMethodEntry
+        {
+            Type = "Multikey",
+            PublicKeyMultibase = mb
+        };
+        Assert.Equal(
+            Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod.VerificationMethodKeyKind.P256,
+            Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod.VerificationMethodKeyKindExtensions.FromEntry(vm));
+    }
+
+    [Fact]
+    public void P256MultikeyDid_SignsAndVerifiesModernRdfc()
+    {
+        var priv = "11".PadRight(64, '1')[..64];
+        var pub = Pila.CredentialSdk.DidComm.Credential.Common.Crypto.P256Signer.PublicFromPrivate(priv);
+        var mb = Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod.Multikey.EncodeP256(pub);
+        var did = "did:example:p256-issuer";
+        var vmId = did + "#key-1";
+        var (port, listener) = StartMultikeyResolver(did, vmId, mb);
+        try
+        {
+            CredentialConfig.Init($"http://127.0.0.1:{port}/");
+            var map = new JsonMap
+            {
+                ["@context"] = new List<object> { "https://www.w3.org/ns/credentials/v2" },
+                ["issuer"] = did,
+                ["type"] = new List<object> { "VerifiableCredential" }
+            };
+            map.AddECDSAProof(priv, vmId, "assertionMethod", CredentialConfig.BaseUrl);
+            Assert.True(map.VerifyProof(CredentialConfig.BaseUrl));
+            var proof = JsonMap.ParseRawToProof(map["proof"]);
+            Assert.StartsWith("z", proof!.ProofValue);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
+    public void AddEcdsaProof_RejectsWhenSignerWouldNeed65ByteTruncation()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            Pila.CredentialSdk.DidComm.Credential.Common.Crypto.P256Signer.Sign(
+                new byte[32], "00".PadRight(64, '0')));
+    }
+
+    [Fact]
     public void GetSigningInput_Returns32ByteDigest()
     {
         var contents = new CredentialContents
         {
             Issuer = "did:example:issuer",
-            Context = new List<object> { "https://www.w3.org/2018/credentials/v1" }
+            Context = new List<object> { "https://www.w3.org/ns/credentials/v2" }
         };
         var cred = JsonCredential.NewJsonCredential(contents);
         Assert.Equal(32, cred.GetSigningInput().Length);
@@ -64,6 +120,31 @@ public class GoInteropFixturesTests : IDisposable
 
     public void Dispose()
     {
+    }
+
+    private static (int port, HttpListener listener) StartMultikeyResolver(string did, string vmId, string multibase)
+    {
+        var port = Random.Shared.Next(20000, 60000);
+        var listener = new HttpListener();
+        listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        listener.Start();
+        _ = Task.Run(async () =>
+        {
+            while (listener.IsListening)
+            {
+                var ctx = await listener.GetContextAsync();
+                var body =
+                    "{\"id\":\"" + did + "\",\"assertionMethod\":[\"" + vmId + "\"],\"authentication\":[\"" + vmId +
+                    "\"],\"verificationMethod\":[{\"id\":\"" + vmId + "\",\"type\":\"Multikey\",\"controller\":\"" +
+                    did + "\",\"publicKeyMultibase\":\"" + multibase + "\"}]}";
+                var bytes = Encoding.UTF8.GetBytes(body);
+                ctx.Response.ContentType = "application/json";
+                ctx.Response.ContentLength64 = bytes.Length;
+                await ctx.Response.OutputStream.WriteAsync(bytes);
+                ctx.Response.Close();
+            }
+        });
+        return (port, listener);
     }
 
     private static (int port, HttpListener listener) StartDidResolver(string did, string vmId, string publicKeyHex)

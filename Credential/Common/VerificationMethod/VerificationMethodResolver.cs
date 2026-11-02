@@ -85,8 +85,17 @@ public class VerificationMethodResolver
         {
             return JwkToPublicKey(vm.PublicKeyJwk);
         }
+        if (!string.IsNullOrEmpty(vm.PublicKeyMultibase))
+        {
+            return Multikey.PublicKeyFromMultibase(vm.PublicKeyMultibase);
+        }
         if (!string.IsNullOrEmpty(vm.PublicKeyHex))
         {
+            if (VerificationMethodKeyKindExtensions.FromEntry(vm) != VerificationMethodKeyKind.Secp256k1)
+            {
+                throw new InvalidOperationException(
+                    $"publicKeyHex is only valid for secp256k1 verification methods, got type {vm.Type}");
+            }
             var hex = Util.Util.RemoveHexPrefix(vm.PublicKeyHex);
             return EcdsaRawVerifier.PublicKeyFromHex(hex, "secp256k1");
         }
@@ -285,6 +294,9 @@ public class VerificationMethodEntry
 
     [JsonPropertyName("publicKeyJwk")]
     public Jwk? PublicKeyJwk { get; set; }
+
+    [JsonPropertyName("publicKeyMultibase")]
+    public string? PublicKeyMultibase { get; set; }
 
     [JsonPropertyName("revoked")]
     public string? Revoked { get; set; }

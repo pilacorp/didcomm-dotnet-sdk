@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Text;
 
 namespace Pila.CredentialSdk.DidComm.Credential.Common.Util;
 
