@@ -324,5 +324,11 @@ public class DidDocument
 
     [JsonPropertyName("assertionMethod")]
     public List<string>? AssertionMethod { get; set; }
+
+    [JsonPropertyName("controller")]
+    public string? Controller { get; set; }
+
+    [JsonPropertyName("didDocumentMetadata")]
+    public Dictionary<string, object>? DidDocumentMetadata { get; set; }
 }
 

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 using Pila.CredentialSdk.DidComm.Credential.Vc;
 using JsonMapType = Pila.CredentialSdk.DidComm.Credential.Common.JsonMap.JsonMap;
 
@@ -85,7 +86,12 @@ public class JsonCredential : ICredential
         }
 
         var issuer = issuerObj.ToString()!;
-        var verificationMethod = $"{issuer}#{_verificationMethod}";
+        var vmKey = string.IsNullOrEmpty(options.VerificationMethodKey) ? _verificationMethod : options.VerificationMethodKey;
+        var verificationMethod = $"{issuer}#{vmKey}";
+        if (options.Resolver != null)
+        {
+            verificationMethod = ResolveSigningVm.Resolve(issuer, "assertionMethod", vmKey, options.Resolver).Url;
+        }
 
         // Use JsonMap to add proof
         _jsonMap.AddECDSAProof(privateKeyHex, verificationMethod, "assertionMethod", options.DidBaseUrl);

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 using JsonMapType = Pila.CredentialSdk.DidComm.Credential.Common.JsonMap.JsonMap;
 
 namespace Pila.CredentialSdk.DidComm.Credential.Vc;
@@ -217,6 +218,11 @@ public class CredentialOptions
     /// Verification method key (default: "key-1").
     /// </summary>
     public string VerificationMethodKey { get; set; } = "key-1";
+
+    /// <summary>
+    /// Optional DID document resolver used when adding proofs.
+    /// </summary>
+    public IDidDocumentResolver? Resolver { get; set; }
 }
 
 /// <summary>
@@ -254,6 +260,11 @@ public static class CredentialOpts
     public static CredentialOpt WithVerifyProof()
     {
         return (options) => options.IsVerifyProof = true;
+    }
+
+    public static CredentialOpt WithResolver(IDidDocumentResolver resolver)
+    {
+        return (options) => options.Resolver = resolver;
     }
 }
 

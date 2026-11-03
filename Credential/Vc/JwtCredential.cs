@@ -174,6 +174,21 @@ public class JwtCredential : ICredential
     /// </summary>
     public void AddProof(string privateKeyHex, params CredentialOpt[] opts)
     {
+        var options = Credential.GetOptions(opts);
+        if (options.Resolver != null)
+        {
+            var issuer = "";
+            if (_payloadData.TryGetValue("issuer", out var issuerObj) && issuerObj != null)
+            {
+                issuer = issuerObj.ToString() ?? "";
+            }
+            if (string.IsNullOrEmpty(issuer))
+            {
+                throw new InvalidOperationException("issuer is required to add proof");
+            }
+            ResolveSigningVm.Resolve(issuer, "assertionMethod", options.VerificationMethodKey, options.Resolver);
+        }
+
         // Hash the signing input
         var hashMessage = Canonicalizer.ComputeDigest(Encoding.UTF8.GetBytes(_signingInput));
 
