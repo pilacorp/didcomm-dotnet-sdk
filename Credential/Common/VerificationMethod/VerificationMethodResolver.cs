@@ -11,19 +11,33 @@ namespace Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 /// <summary>
 /// Resolves verification methods from DID documents.
 /// </summary>
-public class VerificationMethodResolver
+public class VerificationMethodResolver : IDidDocumentResolver
 {
+    // SSRF response-size cap: a DID document is small; refuse oversized bodies.
+    private const int MaxResponseBytes = 1 * 1024 * 1024;
+
     private readonly string _baseUrl;
+    private readonly bool _allowPrivateHosts;
     private readonly HttpClient _httpClient;
 
-    public VerificationMethodResolver(string baseUrl)
+    public VerificationMethodResolver(string baseUrl, bool allowPrivateHosts = true)
     {
         _baseUrl = baseUrl;
-        _httpClient = new HttpClient
+        _allowPrivateHosts = allowPrivateHosts;
+        // Disable auto-redirects so a resolver response cannot bounce the client
+        // onto an internal host; cap the overall request time.
+        var handler = new HttpClientHandler { AllowAutoRedirect = false };
+        _httpClient = new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(10)
         };
     }
+
+    /// <summary>
+    /// Synchronous DID document resolution (<see cref="IDidDocumentResolver"/>).
+    /// </summary>
+    public DidDocument ResolveDocument(string did) =>
+        ResolveToDocAsync(did).GetAwaiter().GetResult();
 
     /// <summary>
     /// Gets the public key in hex format for a given verification method URL.
@@ -172,19 +186,26 @@ public class VerificationMethodResolver
     /// </summary>
     private async Task<DidDocument> ResolveToDocAsync(string did)
     {
-        // Construct and encode API URL
+        // Construct and encode API URL (the DID is escaped into the path, so it
+        // cannot alter the host), then validate the target before any request.
         var encodedDid = Uri.EscapeDataString(did);
         var apiUrl = $"{_baseUrl.TrimEnd('/')}/{encodedDid}";
+        ResolverGuard.ValidateUrl(apiUrl, _allowPrivateHosts);
 
-        // Perform HTTP GET request
-        var response = await _httpClient.GetAsync(apiUrl);
+        // Perform HTTP GET request. Auto-redirects are disabled on the handler,
+        // so a 3xx here is a failure rather than a bounce to another host.
+        var response = await _httpClient.GetAsync(apiUrl, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
             throw new HttpRequestException($"DID resolver API returned non-200 status: {response.StatusCode}");
         }
 
-        // Read and parse response
-        var json = await response.Content.ReadAsStringAsync();
+        // Read and parse response, capping the body size (SSRF/DoS guard).
+        if (response.Content.Headers.ContentLength is long len && len > MaxResponseBytes)
+        {
+            throw new InvalidOperationException($"DID resolver response too large: {len} bytes");
+        }
+        var json = await ReadCappedAsync(response);
         var doc = JsonSerializer.Deserialize<DidDocument>(json, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
@@ -196,6 +217,24 @@ public class VerificationMethodResolver
         }
 
         return doc;
+    }
+
+    private static async Task<string> ReadCappedAsync(HttpResponseMessage response)
+    {
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        var buffer = new byte[MaxResponseBytes + 1];
+        var total = 0;
+        int read;
+        while (total < buffer.Length
+               && (read = await stream.ReadAsync(buffer.AsMemory(total, buffer.Length - total))) > 0)
+        {
+            total += read;
+        }
+        if (total > MaxResponseBytes)
+        {
+            throw new InvalidOperationException("DID resolver response exceeds size cap");
+        }
+        return System.Text.Encoding.UTF8.GetString(buffer, 0, total);
     }
 
     /// <summary>

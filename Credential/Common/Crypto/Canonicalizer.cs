@@ -34,12 +34,12 @@ public static class Canonicalizer
     /// <param name="document">The document to canonicalize</param>
     /// <returns>Canonicalized N-Quads as UTF-8 bytes</returns>
     /// <exception cref="ArgumentNullException">Thrown when document is null</exception>
-    public static byte[] CanonicalizeWithoutProof(Dictionary<string, object?> document)
+    public static byte[] CanonicalizeWithoutProof(Dictionary<string, object?> document, bool legacyStringScalars = false)
     {
         ArgumentNullException.ThrowIfNull(document);
 
         var documentWithoutProof = RemoveProofField(document);
-        var standardized = CredentialHelper.StandardizeToJsonLd(documentWithoutProof);
+        var standardized = CredentialHelper.StandardizeToJsonLd(documentWithoutProof, legacyStringScalars);
         var jsonString = JsonSerializer.Serialize(standardized);
 
         var options = CreateJsonLdOptions();

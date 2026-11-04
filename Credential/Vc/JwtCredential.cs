@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Pila.CredentialSdk.DidComm.Credential.Common.Crypto;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.Jwt;
 using Pila.CredentialSdk.DidComm.Credential.Common.Util;
 using Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 using Pila.CredentialSdk.DidComm.Credential.Vc;
@@ -295,75 +296,45 @@ public class JwtCredential : ICredential
 
         if (options.IsVerifyProof)
         {
-            VerifyProof(options.DidBaseUrl);
+            VerifyProof(options);
         }
     }
 
     /// <summary>
-    /// Verifies the JWT proof.
+    /// Verifies the JWT proof, binding the signing key to the signer the payload
+    /// names (issuer for a VC). Resolution goes through an injected resolver when
+    /// supplied; otherwise through HTTP, unless offline mode forbids the network.
     /// </summary>
-    private void VerifyProof(string didBaseUrl)
+    private void VerifyProof(CredentialOptions options)
     {
         if (string.IsNullOrEmpty(_signature))
         {
             throw new InvalidOperationException("JWT signature is missing");
         }
 
-        // Split signing input to get header and payload
         var parts = _signingInput.Split('.');
         if (parts.Length != 2)
         {
             throw new InvalidOperationException("Invalid JWT signing input format");
         }
 
-        var headerEncoded = parts[0];
-        var payloadEncoded = parts[1];
+        var resolver = ResolveResolver(options);
+        var token = $"{_signingInput}.{_signature}";
+        JwtVerifier.Verify(token, resolver);
+    }
 
-        // Decode header to get kid
-        var headerBytes = Util.Base64UrlDecode(headerEncoded);
-        var headerJson = Encoding.UTF8.GetString(headerBytes);
-        var header = JsonSerializer.Deserialize<Dictionary<string, object>>(headerJson);
-
-        if (header == null || !header.TryGetValue("kid", out var kidObj) || kidObj == null)
+    private static IDidDocumentResolver ResolveResolver(CredentialOptions options)
+    {
+        if (options.Resolver != null)
         {
-            throw new InvalidOperationException("JWT header missing 'kid' (key ID)");
+            return options.Resolver;
         }
-
-        var kid = kidObj.ToString();
-        if (string.IsNullOrEmpty(kid))
+        if (options.IsOffline)
         {
-            throw new InvalidOperationException("JWT header 'kid' is empty");
+            throw new InvalidOperationException(
+                "offline verification requires an injected resolver (use CredentialOpts.WithResolver)");
         }
-
-        // Extract DID from kid (format: {DID}#{keyId})
-        var kidParts = kid.Split('#');
-        if (kidParts.Length == 0 || string.IsNullOrEmpty(kidParts[0]))
-        {
-            throw new InvalidOperationException($"Invalid kid format: {kid}");
-        }
-
-        var did = kidParts[0];
-
-        // Resolve public key from DID
-        var resolver = new VerificationMethodResolver(didBaseUrl);
-        var publicKeyHex = resolver.GetDefaultPublicKeyAsync(did).GetAwaiter().GetResult();
-
-        // Decode signature from base64url to bytes
-        var signatureBytes = Util.Base64UrlDecode(_signature);
-
-        // Convert signature to hex (JWT uses 64-byte r,s format)
-        var signatureHex = Convert.ToHexString(signatureBytes).ToLowerInvariant();
-
-        // Verify signature
-        // The message to verify is the signing input (header.payload)
-        var messageBytes = Encoding.UTF8.GetBytes(_signingInput);
-        var hashMessage = Canonicalizer.ComputeDigest(messageBytes);
-        var isValid = EcdsaVerifier.VerifySignature(publicKeyHex, signatureHex, hashMessage);
-
-        if (!isValid)
-        {
-            throw new InvalidOperationException("JWT signature verification failed");
-        }
+        return new VerificationMethodResolver(options.DidBaseUrl);
     }
 }
 

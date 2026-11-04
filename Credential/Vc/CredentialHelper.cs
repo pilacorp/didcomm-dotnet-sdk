@@ -233,7 +233,8 @@ internal static class CredentialHelper
     /// Standardizes a dictionary into JSON-LD compatible format.
     /// Recursively processes all nested values.
     /// </summary>
-    public static Dictionary<string, object?> StandardizeToJsonLd(Dictionary<string, object?> input)
+    public static Dictionary<string, object?> StandardizeToJsonLd(Dictionary<string, object?> input,
+        bool legacyStringScalars = false)
     {
         if (input == null)
             throw new ArgumentNullException(nameof(input));
@@ -242,7 +243,7 @@ internal static class CredentialHelper
 
         foreach (var kvp in input)
         {
-            result[kvp.Key] = ConvertToJsonLdCompatible(kvp.Value);
+            result[kvp.Key] = ConvertToJsonLdCompatible(kvp.Value, legacyStringScalars);
         }
 
         return result;
@@ -255,7 +256,7 @@ internal static class CredentialHelper
     /// Any JsonElement is expanded to CLR types before recursion.
     /// If an exception occurs, the original value is returned unchanged.
     /// </summary>
-    public static object? ConvertToJsonLdCompatible(object? value)
+    public static object? ConvertToJsonLdCompatible(object? value, bool legacyStringScalars = false)
     {
         if (value is JsonElement je)
         {
@@ -272,7 +273,7 @@ internal static class CredentialHelper
                 {
                     var result = new Dictionary<string, object?>(dict.Count);
                     foreach (var kv in dict)
-                        result[kv.Key] = ConvertToJsonLdCompatible(kv.Value);
+                        result[kv.Key] = ConvertToJsonLdCompatible(kv.Value, legacyStringScalars);
                     return result;
                 }
 
@@ -281,12 +282,37 @@ internal static class CredentialHelper
                 {
                     var result = new List<object?>(list.Count);
                     foreach (var item in list)
-                        result.Add(ConvertToJsonLdCompatible(item));
+                        result.Add(ConvertToJsonLdCompatible(item, legacyStringScalars));
                     return result;
                 }
 
             case null:
                 return null;
+
+            // Preserve JSON scalars as their native CLR types so the JSON-LD
+            // processor keeps their datatype (a number canonicalizes to
+            // "n"^^xsd:integer / xsd:double, a bool to xsd:boolean). Stringifying
+            // them produced plain string literals and broke byte-level
+            // canonicalization parity with the Go/TS SDKs for numeric claims.
+            //
+            // legacyStringScalars reproduces that older, string-typed behaviour.
+            // It is used ONLY to verify legacy hex proofs (SDK <= v1.7.0), whose
+            // signatures were made over the string-typed canonical form — the
+            // same split Go keeps between processor.Canonicalize (modern) and
+            // processor.CanonicalizeDocument (legacy hex).
+            case bool:
+            case sbyte:
+            case byte:
+            case short:
+            case ushort:
+            case int:
+            case uint:
+            case long:
+            case ulong:
+            case float:
+            case double:
+            case decimal:
+                return legacyStringScalars ? value.ToString() : value;
 
             default:
                 return value?.ToString();

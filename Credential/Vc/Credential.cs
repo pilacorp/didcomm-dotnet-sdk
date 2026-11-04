@@ -220,9 +220,17 @@ public class CredentialOptions
     public string VerificationMethodKey { get; set; } = "key-1";
 
     /// <summary>
-    /// Optional DID document resolver used when adding proofs.
+    /// Optional DID document resolver used when adding proofs or verifying.
+    /// When set, verification resolves DID documents through it instead of HTTP.
     /// </summary>
     public IDidDocumentResolver? Resolver { get; set; }
+
+    /// <summary>
+    /// Offline verification mode. When true, verification never touches the
+    /// network: a <see cref="Resolver"/> must be supplied or verification fails.
+    /// Safe-by-default guard against network resolution driven by credential input.
+    /// </summary>
+    public bool IsOffline { get; set; } = false;
 }
 
 /// <summary>
@@ -265,6 +273,15 @@ public static class CredentialOpts
     public static CredentialOpt WithResolver(IDidDocumentResolver resolver)
     {
         return (options) => options.Resolver = resolver;
+    }
+
+    /// <summary>
+    /// Enables offline verification: no network resolution is attempted, so a
+    /// resolver must be injected via <see cref="WithResolver"/>.
+    /// </summary>
+    public static CredentialOpt WithOffline()
+    {
+        return (options) => options.IsOffline = true;
     }
 }
 

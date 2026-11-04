@@ -34,7 +34,27 @@ public class JsonMap : Dictionary<string, object>
             ?? throw new InvalidOperationException("Failed to unmarshal JSONMap");
     }
 
+    /// <summary>
+    /// LOW-LEVEL / EXPERT. Signs the document with a raw P-256 private-key hex,
+    /// binding the proof to the caller-supplied <paramref name="verificationMethod"/>
+    /// and <paramref name="proofPurpose"/> as-is — nothing is resolved and the
+    /// suite is fixed to ecdsa-rdfc-2019. The caller is responsible for making the
+    /// VM id, the purpose and the key agree. Prefer the high-level
+    /// <see cref="Pila.CredentialSdk.DidComm.Credential.Vc.JsonCredential.AddProofByKey"/>,
+    /// which resolves the VM for the issuer and selects the suite by key kind.
+    /// </summary>
     public void AddECDSAProof(string privateKeyHex, string verificationMethod, string proofPurpose, string didBaseUrl)
+        => AddECDSAProof(privateKeyHex, verificationMethod, proofPurpose, didBaseUrl, null);
+
+    /// <summary>
+    /// LOW-LEVEL / EXPERT. As the four-argument overload, but when
+    /// <paramref name="vmPublicKey"/> is supplied the freshly produced signature
+    /// is checked against it before the proof is attached, so a signer bound to
+    /// the wrong verification method fails here instead of at the verifier.
+    /// </summary>
+    public void AddECDSAProof(string privateKeyHex, string verificationMethod, string proofPurpose, string didBaseUrl,
+        Org.BouncyCastle.Crypto.Parameters.ECPublicKeyParameters? vmPublicKey,
+        string? challenge = null, string? domain = null)
     {
         var proof = new Proof
         {
@@ -42,7 +62,11 @@ public class JsonMap : Dictionary<string, object>
             Created = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             VerificationMethod = verificationMethod,
             ProofPurpose = proofPurpose,
-            Cryptosuite = ECDSARDFC2019
+            Cryptosuite = ECDSARDFC2019,
+            // Bound into the signature: EcdsaProofConfig serializes challenge/domain,
+            // so they are part of the signed proof configuration (Data Integrity 3.2.5).
+            Challenge = string.IsNullOrEmpty(challenge) ? null : challenge,
+            Domain = string.IsNullOrEmpty(domain) ? null : domain
         };
         var hashData = EcdsaHashData(proof);
         var signDigest = SHA256.HashData(hashData);
@@ -51,6 +75,11 @@ public class JsonMap : Dictionary<string, object>
         {
             throw new InvalidOperationException(
                 $"ecdsa-rdfc-2019 expects a 64-byte P-256 signature (r||s) but got {signature.Length}");
+        }
+        if (vmPublicKey != null && !EcdsaRawVerifier.Verify(vmPublicKey, signDigest, signature))
+        {
+            throw new InvalidOperationException(
+                $"the signature does not verify against verification method '{verificationMethod}'; the signer does not hold that key");
         }
         proof.ProofValue = Multibase.EncodeBase58Btc(signature);
         AppendProof(proof);
@@ -67,6 +96,16 @@ public class JsonMap : Dictionary<string, object>
         return Canonicalizer.ComputeDigest(canonical);
     }
 
+    // Legacy hex proofs (SDK &lt;= v1.7.0) were signed over the body canonicalized
+    // with string-typed scalars. Only the legacy verify path uses this; the
+    // modern ecdsa-rdfc-2019 path keeps DocumentDigest's spec-conformant typing.
+    private byte[] LegacyDocumentDigest()
+    {
+        var body = BodyWithoutProof();
+        var canonical = Canonicalizer.CanonicalizeWithoutProof(body, legacyStringScalars: true);
+        return Canonicalizer.ComputeDigest(canonical);
+    }
+
     public void AddCustomProof(Proof proof)
     {
         if (proof == null)
@@ -76,7 +115,28 @@ public class JsonMap : Dictionary<string, object>
         AppendProof(proof);
     }
 
+    /// <summary>
+    /// Verifies every proof over HTTP, resolving DID documents from
+    /// <paramref name="didBaseUrl"/>.
+    /// </summary>
     public bool VerifyProof(string didBaseUrl)
+    {
+        var resolver = new VerificationMethodResolver(didBaseUrl);
+        return VerifyProofInternal(did => resolver.ResolveDocumentAsync(did).GetAwaiter().GetResult());
+    }
+
+    /// <summary>
+    /// Verifies every proof using an injected DID document resolver. This is the
+    /// offline-capable path: the resolver never touches the network unless it is
+    /// an HTTP resolver, so a static/in-memory resolver verifies without any I/O.
+    /// </summary>
+    public bool VerifyProof(IDidDocumentResolver resolver)
+    {
+        if (resolver == null) throw new ArgumentNullException(nameof(resolver));
+        return VerifyProofInternal(resolver.ResolveDocument);
+    }
+
+    private bool VerifyProofInternal(Func<string, DidDocument> resolveDoc)
     {
         var proofs = RawProofList();
         if (proofs.Count == 0)
@@ -86,7 +146,9 @@ public class JsonMap : Dictionary<string, object>
         foreach (var raw in proofs)
         {
             var proof = ParseRawToProof(raw)!;
-            if (!VerifyOneProof(didBaseUrl, proof))
+            var did = DidFromVerificationMethod(proof.VerificationMethod);
+            var doc = resolveDoc(did);
+            if (!VerifyOneProofWithDoc(doc, proof))
             {
                 return false;
             }
@@ -94,19 +156,16 @@ public class JsonMap : Dictionary<string, object>
         return true;
     }
 
-    private bool VerifyOneProof(string didBaseUrl, Proof proof)
+    private bool VerifyOneProofWithDoc(DidDocument doc, Proof proof)
     {
-        var resolver = new VerificationMethodResolver(didBaseUrl);
+        var vmEntry = FindVmInDoc(doc, proof.VerificationMethod);
+        var pubKey = VerificationMethodMaterial.EcPublicKeyFromEntry(vmEntry);
         if (proof.Type == EcdsaSecp256k1Signature2019 || proof.Type == ECDSASECPKEY)
         {
-            return VerifyEcdsaSecp256k1Proof(resolver, proof);
+            return VerifyEcdsaSecp256k1Proof(doc, vmEntry, pubKey, proof);
         }
         if (proof.Type == DataIntegrityProof && proof.Cryptosuite == ECDSARDFC2019)
         {
-            var vmEntry = resolver.FindVerificationMethodAsync(proof.VerificationMethod).GetAwaiter().GetResult();
-            var didPart = DidFromVerificationMethod(proof.VerificationMethod);
-            var doc = resolver.ResolveDocumentAsync(didPart).GetAwaiter().GetResult();
-            var pubKey = resolver.EcPublicKeyFromEntryAsync(vmEntry).GetAwaiter().GetResult();
             if (!VerifyEcdsaRdfc(pubKey, proof))
             {
                 return false;
@@ -115,6 +174,18 @@ public class JsonMap : Dictionary<string, object>
             return true;
         }
         throw new NotSupportedException($"Unsupported proof type: {proof.Type}");
+    }
+
+    private static VerificationMethodEntry FindVmInDoc(DidDocument doc, string vmUrl)
+    {
+        foreach (var vm in doc.VerificationMethod)
+        {
+            if (vm.Id == vmUrl)
+            {
+                return vm;
+            }
+        }
+        throw new InvalidOperationException($"Verification method '{vmUrl}' not found in DID document");
     }
 
     private bool VerifyEcdsaRdfc(Org.BouncyCastle.Crypto.Parameters.ECPublicKeyParameters publicKey, Proof proof)
@@ -130,7 +201,7 @@ public class JsonMap : Dictionary<string, object>
             var digest = SHA256.HashData(hashData);
             return EcdsaRawVerifier.Verify(publicKey, digest, signature);
         }
-        var legacyDoc = DocumentDigest();
+        var legacyDoc = LegacyDocumentDigest();
         var hexKey = publicKey.Q.GetEncoded(false);
         return EcdsaVerifier.VerifySignature(
             Convert.ToHexString(hexKey).ToLowerInvariant(),
@@ -138,7 +209,8 @@ public class JsonMap : Dictionary<string, object>
             legacyDoc);
     }
 
-    private bool VerifyEcdsaSecp256k1Proof(VerificationMethodResolver resolver, Proof proof)
+    private bool VerifyEcdsaSecp256k1Proof(DidDocument doc, VerificationMethodEntry vmEntry,
+        Org.BouncyCastle.Crypto.Parameters.ECPublicKeyParameters publicKey, Proof proof)
     {
         if (string.IsNullOrEmpty(proof.Jws))
         {
@@ -151,14 +223,10 @@ public class JsonMap : Dictionary<string, object>
         {
             throw new InvalidOperationException($"{EcdsaSecp256k1Signature2019}: jws alg must be {JwsDetached.AlgEs256K}, got {alg}");
         }
-        var vmEntry = resolver.FindVerificationMethodAsync(proof.VerificationMethod).GetAwaiter().GetResult();
         if (VerificationMethodKeyKindExtensions.FromEntry(vmEntry) != VerificationMethodKeyKind.Secp256k1)
         {
             throw new InvalidOperationException($"{EcdsaSecp256k1Signature2019}: verification method does not hold a secp256k1 key");
         }
-        var didPart = DidFromVerificationMethod(proof.VerificationMethod);
-        var doc = resolver.ResolveDocumentAsync(didPart).GetAwaiter().GetResult();
-        var publicKey = resolver.EcPublicKeyFromEntryAsync(vmEntry).GetAwaiter().GetResult();
         var hashData = EcdsaHashData(proof);
         var signingInput = JwsDetached.SigningInput(parts[0], hashData);
         var digest = SHA256.HashData(signingInput);
@@ -219,9 +287,11 @@ public class JsonMap : Dictionary<string, object>
 
     private Dictionary<string, object> EcdsaProofConfig(Proof proof)
     {
-        var json = JsonSerializer.Serialize(proof);
-        var cfg = JsonSerializer.Deserialize<Dictionary<string, object>>(json)
-            ?? throw new InvalidOperationException("failed to build proof configuration");
+        // Proof configuration (Data Integrity 3.2.5): the proof object with the
+        // signature field removed, plus the unsecured document's @context. The
+        // keys are the JSON-LD property names (lowercase), matching the Go SDK's
+        // proof.ToMap() so the canonicalized bytes are identical across SDKs.
+        var cfg = SerializeProof(proof);
         var sigField = proof.Type == EcdsaSecp256k1Signature2019 ? "jws" : "proofValue";
         cfg.Remove(sigField);
         cfg["@context"] = this.TryGetValue("@context", out var ctx) ? ctx : new object();
@@ -300,6 +370,14 @@ public class JsonMap : Dictionary<string, object>
         {
             d["cryptosuite"] = proof.Cryptosuite;
         }
+        if (!string.IsNullOrEmpty(proof.Challenge))
+        {
+            d["challenge"] = proof.Challenge;
+        }
+        if (!string.IsNullOrEmpty(proof.Domain))
+        {
+            d["domain"] = proof.Domain;
+        }
         return d;
     }
 
@@ -347,9 +425,36 @@ public class JsonMap : Dictionary<string, object>
         {
             result.Cryptosuite = cs.ToString();
         }
+        if (proofMap.TryGetValue("challenge", out var ch) && ch != null)
+        {
+            result.Challenge = ch.ToString();
+        }
+        if (proofMap.TryGetValue("domain", out var dm) && dm != null)
+        {
+            result.Domain = dm.ToString();
+        }
         return result;
     }
 
     /// <summary>Canonical document digest (alias for DocumentDigest).</summary>
     public byte[] Canonicalize() => DocumentDigest();
+
+    /// <summary>
+    /// Returns the parsed proofs attached to the document (empty when unsigned).
+    /// Used by presentation verification to enforce challenge/domain on every
+    /// verified proof after the signature check.
+    /// </summary>
+    public List<Proof> Proofs()
+    {
+        var result = new List<Proof>();
+        foreach (var raw in RawProofList())
+        {
+            var p = ParseRawToProof(raw);
+            if (p != null)
+            {
+                result.Add(p);
+            }
+        }
+        return result;
+    }
 }
