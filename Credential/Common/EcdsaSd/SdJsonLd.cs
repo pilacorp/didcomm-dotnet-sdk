@@ -5,6 +5,7 @@ using VDS.RDF.JsonLd;
 using VDS.RDF.JsonLd.Syntax;
 using VDS.RDF.Parsing;
 using VDS.RDF.Writing;
+using Pila.CredentialSdk.DidComm.Credential.Common.Processor;
 
 namespace Pila.CredentialSdk.DidComm.Credential.Common.EcdsaSd;
 
@@ -21,58 +22,19 @@ namespace Pila.CredentialSdk.DidComm.Credential.Common.EcdsaSd;
 /// </summary>
 public static class SdJsonLd
 {
-    // Well-known W3C context URLs mapped to their local file names (next to the
-    // other cached contexts). These let the SD conformance path run offline.
-    private static readonly Dictionary<string, string> WellKnownContexts = new()
-    {
-        { "https://www.w3.org/ns/credentials/v2", "w3c.credential.v2.json" },
-        { "https://www.w3.org/ns/credentials/v2.jsonld", "w3c.credential.v2.json" },
-        { "https://www.w3.org/ns/credentials/examples/v2", "w3c.credential.examples.v2.json" },
-        { "https://www.w3.org/ns/credentials/examples/v2.jsonld", "w3c.credential.examples.v2.json" },
-        { "https://w3id.org/citizenship/v4rc1", "w3c.citizenship.v4rc1.json" },
-        { "https://w3id.org/citizenship/v4rc1.jsonld", "w3c.citizenship.v4rc1.json" }
-    };
-
-    private static JsonLdProcessorOptions Options()
-    {
-        return new JsonLdProcessorOptions
-        {
-            ProcessingMode = JsonLdProcessingMode.JsonLd11,
-            // SafeMode fails on undefined terms instead of silently dropping them
-            // (lossless), matching the Go sdOptions SafeMode=true.
-            SafeMode = true,
-            UseNativeTypes = true,
-            DocumentLoader = (uri, loaderOptions) =>
-            {
-                if (WellKnownContexts.TryGetValue(uri.ToString(), out var localFileName))
-                {
-                    var path = GetSearchPaths(localFileName).FirstOrDefault(File.Exists);
-                    if (path != null)
-                    {
-                        return new RemoteDocument { DocumentUrl = uri, Document = JToken.Parse(File.ReadAllText(path)) };
-                    }
-                }
-                return DefaultDocumentLoader.LoadJson(uri, loaderOptions);
-            }
-        };
-    }
-
-    private static IEnumerable<string> GetSearchPaths(string fileName)
-    {
-        return new[]
-        {
-            fileName,
-            Path.Combine("Credential", "Common", "Crypto", fileName),
-            $"Credential/Common/Crypto/{fileName}"
-        };
-    }
+    // Options() builds a fresh per-operation ContextBudget (remote @context bounds, term bounds,
+    // bundled W3C contexts offline). SafeMode fails on undefined terms instead of silently dropping
+    // them (lossless), matching the Go sdOptions SafeMode=true.
+    private static JsonLdProcessorOptions Options(JToken? inlineDoc) =>
+        ContextBudget.NewOptions(inlineDoc, safeMode: true, nativeTypes: true);
 
     /// <summary>Expands a compact JSON-LD document (SafeMode: fails on undefined terms).</summary>
-    public static JArray ExpandJsonLd(JToken doc) => JsonLdProcessor.Expand(doc, Options());
+    public static JArray ExpandJsonLd(JToken doc) =>
+        ContextBudget.Guard("expand", () => JsonLdProcessor.Expand(doc, Options(doc)));
 
     /// <summary>Compacts an expanded JSON-LD document against <paramref name="context"/>.</summary>
     public static JObject CompactJsonLd(JToken expanded, JToken? context) =>
-        JsonLdProcessor.Compact(expanded, context, Options());
+        ContextBudget.Guard("compact", () => JsonLdProcessor.Compact(expanded, context, Options(null)));
 
     /// <summary>
     /// Converts a JSON-LD document to N-Quads (each ending in "\n"), in toRDF
@@ -80,7 +42,7 @@ public static class SdJsonLd
     /// </summary>
     public static List<string> ToRdfNQuads(JToken doc)
     {
-        var store = ParseToStore(doc);
+        var store = ContextBudget.Guard("to rdf", () => ParseToStore(doc));
         var sw = new System.IO.StringWriter();
         new NQuadsWriter(NQuadsSyntax.Rdf11).Save(store, sw);
         // dotNetRDF's N-Quads writer emits the redundant explicit datatype on
@@ -97,7 +59,7 @@ public static class SdJsonLd
     /// </summary>
     public static (List<string> NQuads, Dictionary<string, string> IdMap) CanonicalizeWithIdMap(JToken doc)
     {
-        return CanonicalizeStore(ParseToStore(doc));
+        return ContextBudget.Guard("canonicalize", () => CanonicalizeStore(ParseToStore(doc)));
     }
 
     /// <summary>
@@ -105,10 +67,13 @@ public static class SdJsonLd
     /// </summary>
     public static (List<string> NQuads, Dictionary<string, string> IdMap) CanonicalizeNQuadsWithIdMap(IEnumerable<string> nquads)
     {
-        var store = new TripleStore();
-        using var reader = new StringReader(string.Concat(nquads));
-        new NQuadsParser(NQuadsSyntax.Rdf11).Load(store, reader);
-        return CanonicalizeStore(store);
+        return ContextBudget.Guard("canonicalize", () =>
+        {
+            var store = new TripleStore();
+            using var reader = new StringReader(string.Concat(nquads));
+            new NQuadsParser(NQuadsSyntax.Rdf11).Load(store, reader);
+            return CanonicalizeStore(store);
+        });
     }
 
     /// <summary>
@@ -132,13 +97,13 @@ public static class SdJsonLd
     {
         var store = new TripleStore();
         using var reader = new StringReader(doc.ToString());
-        new JsonLdParser(Options()).Load(store, reader);
+        new JsonLdParser(Options(doc)).Load(store, reader);
         return store;
     }
 
     private static (List<string>, Dictionary<string, string>) CanonicalizeStore(TripleStore store)
     {
-        var result = new RdfCanonicalizer().Canonicalize(store);
+        var result = BlankNodeWork.Normalize(store);
         var idMap = new Dictionary<string, string>();
         foreach (var kv in result.IssuedIdentifiersMap)
         {

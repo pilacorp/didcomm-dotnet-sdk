@@ -85,4 +85,32 @@ public static class ResolverGuard
         }
         return false;
     }
+
+    private static readonly IPNetwork[] NonPublic = new[]
+    {
+        "0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12",
+        "192.0.0.0/24", "192.0.2.0/24", "192.88.99.2/32", "192.168.0.0/16", "198.18.0.0/15", "198.51.100.0/24",
+        "203.0.113.0/24", "224.0.0.0/4", "240.0.0.0/4",
+        "64:ff9b:1::/48", "100::/64", "100:0:0:1::/64", "2001::/23", "2001:db8::/32", "3fff::/20", "5f00::/16",
+        "fc00::/7", "fe80::/10", "fec0::/10", "ff00::/8",
+    }.Select(IPNetwork.Parse).ToArray();
+
+    /// <summary>
+    /// Strict check used for @context fetches (table of go processor.isPublicAddr: the IANA special-purpose
+    /// registries' non-global entries plus multicast and site-local). An IPv6 address carrying an IPv4 address
+    /// (mapped, ::/96, NAT64, 6to4) is judged by that IPv4 address.
+    /// </summary>
+    public static bool IsPublicAddress(IPAddress ip)
+    {
+        var b = ip.GetAddressBytes(); // the scope id is dropped
+        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            ip = new IPAddress(b);
+            if (ip.IsIPv4MappedToIPv6 || IPNetwork.Parse("::/96").Contains(ip) || IPNetwork.Parse("64:ff9b::/96").Contains(ip))
+                ip = new IPAddress(b[12..16]);
+            else if (b[0] == 0x20 && b[1] == 0x02)
+                ip = new IPAddress(b[2..6]);
+        }
+        return !NonPublic.Any(n => n.Contains(ip));
+    }
 }
