@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Pila.CredentialSdk.DidComm.Credential.Common.Dto;
+using Pila.CredentialSdk.DidComm.Credential.Common.VerificationMethod;
 using Pila.CredentialSdk.DidComm.Credential.Vc;
 using JsonMapType = Pila.CredentialSdk.DidComm.Credential.Common.JsonMap.JsonMap;
 
@@ -73,7 +74,13 @@ public class JsonCredential : ICredential
     }
 
     /// <summary>
-    /// Adds an ECDSA proof to the credential.
+    /// LOW-LEVEL / EXPERT. Adds a P-256 ecdsa-rdfc-2019 proof with a raw
+    /// private-key hex. The verification method is <c>issuer#verificationMethodKey</c>,
+    /// resolved through <see cref="CredentialOptions.Resolver"/> when one is set,
+    /// and the suite is fixed to ecdsa-rdfc-2019 regardless of the key's kind.
+    /// Prefer <see cref="AddProofByKey"/>, which resolves the signing VM for the
+    /// issuer, selects the proof suite by the resolved key's kind, binds the
+    /// signer to that key, and honours offline mode.
     /// </summary>
     public void AddProof(string privateKeyHex, params CredentialOpt[] opts)
     {
@@ -85,10 +92,77 @@ public class JsonCredential : ICredential
         }
 
         var issuer = issuerObj.ToString()!;
-        var verificationMethod = $"{issuer}#{_verificationMethod}";
+        var vmKey = string.IsNullOrEmpty(options.VerificationMethodKey) ? _verificationMethod : options.VerificationMethodKey;
+        var verificationMethod = $"{issuer}#{vmKey}";
+        if (options.Resolver != null)
+        {
+            verificationMethod = ResolveSigningVm.Resolve(issuer, "assertionMethod", vmKey, options.Resolver).Url;
+        }
 
         // Use JsonMap to add proof
         _jsonMap.AddECDSAProof(privateKeyHex, verificationMethod, "assertionMethod", options.DidBaseUrl);
+    }
+
+    /// <summary>
+    /// HIGH-LEVEL issuance. Resolves the signing verification method for the
+    /// credential's issuer (DID + assertionMethod + key) through the configured
+    /// resolver, selects the proof suite from the resolved key's kind
+    /// (P-256 =&gt; DataIntegrityProof / ecdsa-rdfc-2019), binds the signer to that
+    /// key, signs, and returns the serialized credential. The caller supplies
+    /// only the private key and options (resolver / offline / verificationMethodKey);
+    /// it never picks a verification-method id, a proof purpose or a suite.
+    /// Mirrors Go <c>vc.JSONCredential.AddProofByProvider</c>.
+    /// </summary>
+    /// <returns>The serialized credential (with its proof attached).</returns>
+    public object AddProofByKey(string privateKeyHex, params CredentialOpt[] opts)
+    {
+        if (string.IsNullOrEmpty(privateKeyHex))
+        {
+            throw new ArgumentException("private key is required", nameof(privateKeyHex));
+        }
+
+        var options = Credential.GetOptions(opts);
+
+        if (!_jsonMap.TryGetValue("issuer", out var issuerObj) || issuerObj == null)
+        {
+            throw new InvalidOperationException("Issuer is required to add proof");
+        }
+
+        var issuer = issuerObj.ToString()!;
+        var vmKey = string.IsNullOrEmpty(options.VerificationMethodKey) ? _verificationMethod : options.VerificationMethodKey;
+
+        // A resolver is required at signing time: the suite is chosen from the
+        // resolved VM's key type. Offline mode forbids falling back to HTTP.
+        var resolver = options.Resolver;
+        if (resolver == null)
+        {
+            if (options.IsOffline)
+            {
+                throw new InvalidOperationException(
+                    "offline signing requires an injected resolver (use WithResolver)");
+            }
+            resolver = new VerificationMethodResolver(options.DidBaseUrl);
+        }
+
+        var signingVm = ResolveSigningVm.Resolve(issuer, "assertionMethod", vmKey, resolver);
+        var kind = VerificationMethodKeyKindExtensions.FromEntry(signingVm.Vm);
+        switch (kind)
+        {
+            case VerificationMethodKeyKind.P256:
+                var vmPub = VerificationMethodMaterial.EcPublicKeyFromEntry(signingVm.Vm);
+                _jsonMap.AddECDSAProof(privateKeyHex, signingVm.Url, "assertionMethod", options.DidBaseUrl, vmPub);
+                break;
+            case VerificationMethodKeyKind.Secp256k1:
+                throw new NotSupportedException(
+                    "secp256k1 EcdsaSecp256k1Signature2019 linked-data signing is not implemented in the .NET SDK yet; " +
+                    "sign with a P-256 (ecdsa-rdfc-2019) verification method, or supply a secp256k1 detached-JWS signer. " +
+                    "secp256k1 proofs can still be verified.");
+            default:
+                throw new NotSupportedException(
+                    $"verification method '{signingVm.Url}' has an unsupported key type");
+        }
+
+        return Serialize();
     }
 
     /// <summary>
@@ -96,7 +170,12 @@ public class JsonCredential : ICredential
     /// </summary>
     public byte[] GetSigningInput()
     {
-        return _jsonMap.Canonicalize();
+        return _jsonMap.GetDocumentDigest();
+    }
+
+    public byte[] CreateProofSigning(byte[] docHash, Proof proof)
+    {
+        return _jsonMap.CreateProofSigning(docHash, proof);
     }
 
     /// <summary>
@@ -123,11 +202,30 @@ public class JsonCredential : ICredential
     /// </summary>
     public void Verify(params CredentialOpt[] opts)
     {
-        var options = Credential.GetOptions(opts);
-        options.IsVerifyProof = true;
+        VerifyInternal(Credential.GetOptions(opts));
+    }
 
-        // Use JsonMap to verify proof
-        var isValid = _jsonMap.VerifyProof(options.DidBaseUrl);
+    /// <summary>
+    /// Verifies the proof honouring the injected resolver and offline mode:
+    /// an injected resolver is used directly (no network); offline mode without a
+    /// resolver is refused; otherwise DID documents are resolved over HTTP.
+    /// </summary>
+    private void VerifyInternal(CredentialOptions options)
+    {
+        bool isValid;
+        if (options.Resolver != null)
+        {
+            isValid = _jsonMap.VerifyProof(options.Resolver);
+        }
+        else if (options.IsOffline)
+        {
+            throw new InvalidOperationException(
+                "offline verification requires an injected resolver (use WithResolver)");
+        }
+        else
+        {
+            isValid = _jsonMap.VerifyProof(options.DidBaseUrl);
+        }
 
         if (!isValid)
         {
@@ -178,11 +276,7 @@ public class JsonCredential : ICredential
 
         if (options.IsVerifyProof)
         {
-            var isValid = _jsonMap.VerifyProof(options.DidBaseUrl);
-            if (!isValid)
-            {
-                throw new InvalidOperationException("Proof verification failed");
-            }
+            VerifyInternal(options);
         }
     }
 }
