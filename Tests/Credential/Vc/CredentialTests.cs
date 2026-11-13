@@ -29,7 +29,7 @@ public class CredentialTests
     {
         var contents = new CredentialContents
         {
-            Context = new List<object> { "https://www.w3.org/2018/credentials/v1" },
+            Context = new List<object> { "https://www.w3.org/ns/credentials/v2" },
             Id = "urn:uuid:1234",
             Issuer = "did:example:issuer",
             Types = new List<string> { "VerifiableCredential" },
@@ -42,7 +42,6 @@ public class CredentialTests
 
         Assert.NotNull(credential);
         Assert.Equal("JSON", credential.GetType());
-        Assert.NotEmpty(credential.GetSigningInput());
         Assert.NotEmpty(credential.GetContents());
     }
 

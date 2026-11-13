@@ -1,0 +1,35 @@
+{
+  "did": "did:example:p256-interop-issuer",
+  "documentDigestHex": "b7ea56b71f207db5e9f2dd4eb149baf86b36bfd2c75fe92ab5e2f3cbef98c21e",
+  "privHex": "c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721",
+  "proofConfigCanonical": "_:c14n0 \u003chttp://purl.org/dc/terms/created\u003e \"2026-11-04T08:30:23Z\"^^\u003chttp://www.w3.org/2001/XMLSchema#dateTime\u003e .\n_:c14n0 \u003chttp://www.w3.org/1999/02/22-rdf-syntax-ns#type\u003e \u003chttps://w3id.org/security#DataIntegrityProof\u003e .\n_:c14n0 \u003chttps://w3id.org/security#cryptosuite\u003e \"ecdsa-rdfc-2019\"^^\u003chttps://w3id.org/security#cryptosuiteString\u003e .\n_:c14n0 \u003chttps://w3id.org/security#proofPurpose\u003e \u003chttps://w3id.org/security#assertionMethod\u003e .\n_:c14n0 \u003chttps://w3id.org/security#verificationMethod\u003e \u003cdid:example:p256-interop-issuer#key-1\u003e .\n",
+  "proofConfigHashHex": "c1a8688613dc94e1c69f8a2a9a4c479d266360d0a4d907833378e0384a022c46",
+  "signedCredential": {
+    "@context": [
+      "https://www.w3.org/ns/credentials/v2",
+      "https://www.w3.org/ns/credentials/examples/v2"
+    ],
+    "credentialSubject": {
+      "age": 30,
+      "id": "did:example:subject-1",
+      "name": "Alice"
+    },
+    "id": "urn:uuid:interop-fixture-0001",
+    "issuer": "did:example:p256-interop-issuer",
+    "proof": {
+      "created": "2026-11-04T08:30:23Z",
+      "cryptosuite": "ecdsa-rdfc-2019",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z65jQQUvDpMHpQSPV3nmMn3nDmxt6r2qeDjyh8mmrca6qDqdS9K1tAC1HxqdAGk6HfgLnrawgVzFqzWQ7eUQkjysy",
+      "type": "DataIntegrityProof",
+      "verificationMethod": "did:example:p256-interop-issuer#key-1"
+    },
+    "type": [
+      "VerifiableCredential",
+      "ExampleDegreeCredential"
+    ],
+    "validFrom": "2025-01-01T00:00:00Z"
+  },
+  "signingInputHex": "c1a8688613dc94e1c69f8a2a9a4c479d266360d0a4d907833378e0384a022c46b7ea56b71f207db5e9f2dd4eb149baf86b36bfd2c75fe92ab5e2f3cbef98c21e",
+  "vmId": "did:example:p256-interop-issuer#key-1"
+}

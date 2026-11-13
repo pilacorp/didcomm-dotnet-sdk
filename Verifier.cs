@@ -188,7 +188,7 @@ public static class Verifier
             }
             
             Console.WriteLine("DataIntegrityProof signature format validated");
-            return true;
+            return false;
         }
         catch (Exception ex)
         {
